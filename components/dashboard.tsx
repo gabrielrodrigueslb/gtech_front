@@ -26,7 +26,7 @@ export default function Dashboard() {
   ]
 
   return (
-    <div>
+    <div className="">
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-2" style={{ color: "hsl(var(--foreground))" }}>
           Dashboard

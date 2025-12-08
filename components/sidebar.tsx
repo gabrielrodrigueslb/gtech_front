@@ -1,6 +1,9 @@
 'use client';
 import { MdLeaderboard } from 'react-icons/md';
 import { TiContacts } from 'react-icons/ti';
+import { LuLayoutDashboard } from "react-icons/lu";
+import { GoGraph } from "react-icons/go";
+import { FaTasks } from "react-icons/fa";
 
 interface SidebarProps {
   activeTab: string;
@@ -9,11 +12,11 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'dashboard', label: 'Dashboard', icon: <LuLayoutDashboard /> },
     { id: 'contacts', label: 'Contatos', icon: <TiContacts /> },
     { id: 'deals', label: 'Negócios', icon: <MdLeaderboard /> },
-    { id: 'tasks', label: 'Tarefas', icon: '✓' },
-    { id: 'analytics', label: 'Relatórios', icon: '📈' },
+    { id: 'tasks', label: 'Tarefas', icon: <FaTasks /> },
+    { id: 'analytics', label: 'Relatórios', icon: <GoGraph /> },
   ];
 
   return (
