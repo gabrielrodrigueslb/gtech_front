@@ -12,6 +12,7 @@ import {
   updateOpportunity as updateOpportunityService,
   deleteOpportunity as deleteOpportunityService,
 } from '@/lib/opportunity';
+import { getUsers, type User } from '@/lib/user'; //
 import { useCRM, type Deal } from '@/context/crm-context';
 
 export default function Deals() {
@@ -27,7 +28,6 @@ export default function Deals() {
   } = useCRM();
 
   // --- ESTADOS GERAIS ---
-  // Iniciamos vazio para esperar o carregamento dos funis
   const [activeFunnelId, setActiveFunnelId] = useState<string>('');
 
   const [showModal, setShowModal] = useState(false);
@@ -36,6 +36,9 @@ export default function Deals() {
 
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+
+  // Lista de Usuários (Responsáveis)
+  const [users, setUsers] = useState<User[]>([]);
 
   // --- DRAG AND DROP (KANBAN CARDS) ---
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null);
@@ -50,6 +53,7 @@ export default function Deals() {
     description: '',
     value: 0,
     contactId: '',
+    ownerId: '', // Novo campo para o Responsável
     probability: 50,
     expectedClose: '',
   });
@@ -64,16 +68,12 @@ export default function Deals() {
     { name: 'Fechado', color: '#10B981' },
   ]);
 
-  // Drag and Drop (Stages Creation)
   const [draggedStageIndex, setDraggedStageIndex] = useState<number | null>(
     null,
   );
-
-  // Inputs para adicionar etapa
   const [newStageName, setNewStageName] = useState('');
   const [newStageColor, setNewStageColor] = useState('#6366F1');
 
-  // Cores sugeridas
   const PRESET_COLORS = [
     '#F59E0B',
     '#3B82F6',
@@ -85,17 +85,17 @@ export default function Deals() {
   ];
 
   // --------------------------------------------------------
-  // 1. CARREGAMENTO INICIAL (FUNIS)
+  // 1. CARREGAMENTO INICIAL (FUNIS E USUÁRIOS)
   // --------------------------------------------------------
   useEffect(() => {
-    async function loadFunnels() {
+    async function loadInitialData() {
       try {
-        const data = await getPipelines();
-        console.log('Funis vindos do Back-end:', data); //
+        // Carrega Funis
+        const funnelsData = await getPipelines();
+        console.log('Funis vindos do Back-end:', funnelsData);
 
-        if (data && data.length > 0) {
-          // 1. Atualiza o Contexto com os funis do banco
-          data.forEach((pipeline: any) => {
+        if (funnelsData && funnelsData.length > 0) {
+          funnelsData.forEach((pipeline: any) => {
             const exists = funnels.find((f) => f.id === pipeline.id);
             if (!exists) {
               addFunnel({
@@ -105,56 +105,56 @@ export default function Deals() {
               });
             }
           });
-
-          // 2. Define o primeiro funil como ativo se não tiver nenhum selecionado
           if (!activeFunnelId) {
-            setActiveFunnelId(data[0].id);
+            setActiveFunnelId(funnelsData[0].id);
           }
         }
+
+        // Carrega Usuários (para o select de responsáveis)
+        const usersData = await getUsers();
+        setUsers(usersData || []);
+
       } catch (error: any) {
-        // --- CORREÇÃO AQUI ---
-        // Se o erro for 403 (Proibido) ou 401 (Não autorizado), nós ignoramos silenciosamente.
-        // Isso evita o erro vermelho no console quando o usuário ainda não logou.
+        // --- CORREÇÃO DE ERRO 403/401 ---
+        // Se o usuário não estiver logado ou sem permissão, silencia o erro no console
         if (
           error.response &&
           (error.response.status === 403 || error.response.status === 401)
         ) {
           return;
         }
-
-        // Apenas erros reais de sistema (500, rede, etc) serão mostrados
-        console.error('Erro ao carregar funis:', error);
+        console.error('Erro ao carregar dados iniciais:', error);
       }
     }
-    loadFunnels();
+    loadInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --------------------------------------------------------
-  // 2. CARREGAMENTO DE OPORTUNIDADES (QUANDO MUDA O FUNIL)
+  // 2. CARREGAMENTO DE OPORTUNIDADES
   // --------------------------------------------------------
   useEffect(() => {
     async function fetchDeals() {
       if (!activeFunnelId) return;
 
       try {
-        // Busca oportunidades do funil ativo na API
         const remoteDeals = await getOpportunities(activeFunnelId);
 
-        // Mapeia do formato do Backend (amount, dueDate) para o formato do Contexto (value, expectedClose)
         remoteDeals.forEach((d: any) => {
-          // Verifica duplicação visual no contexto
           const exists = deals.find((localDeal) => localDeal.id === d.id);
 
           if (!exists) {
+            // Mapeia dados do backend para o contexto
             addDeal({
               id: d.id,
               title: d.title,
               description: d.description,
-              value: d.amount || 0, // Backend manda 'amount'
+              value: d.amount || 0,
               probability: d.probability,
-              contactId: d.contacts?.[0]?.id || '', // Pega o primeiro contato vinculado
-              stage: d.stageId || d.stage?.id, // Backend manda stageId ou objeto stage
+              contactId: d.contacts?.[0]?.id || '',
+              ownerId: d.owner?.id, // ID do responsável
+              owner: d.owner,       // Objeto do responsável {id, name}
+              stage: d.stageId || d.stage?.id,
               funnelId: d.pipelineId,
               expectedClose: d.dueDate ? new Date(d.dueDate) : new Date(),
               createdAt: new Date(d.createdAt),
@@ -172,6 +172,18 @@ export default function Deals() {
 
   const activeFunnel = funnels.find((f) => f.id === activeFunnelId);
   const funnelDeals = deals.filter((d) => d.funnelId === activeFunnelId);
+
+  // --------------------------------------------------------
+  // HELPER DE UI: Avatar do Usuário
+  // --------------------------------------------------------
+  const renderUserAvatar = (name: string, size = "w-6 h-6", textSize = "text-xs") => {
+    const initial = name ? name[0].toUpperCase() : '?';
+    return (
+      <div className={`${size} bg-amber-400 rounded-full flex items-center justify-center font-bold text-white shrink-0 ${textSize}`} title={name}>
+        {initial}
+      </div>
+    );
+  };
 
   // --------------------------------------------------------
   // AÇÕES DE PIPELINE (CRIAR/ESTÁGIOS/DRAG-DROP ETAPAS)
@@ -195,7 +207,6 @@ export default function Deals() {
     setFunnelStages(newStages);
   };
 
-  // Drag and Drop das ETAPAS (na criação do funil)
   const handleStageDragStart = (index: number) => setDraggedStageIndex(index);
   const handleStageDragOver = (e: React.DragEvent) => e.preventDefault();
   const handleStageDrop = (targetIndex: number) => {
@@ -244,7 +255,6 @@ export default function Deals() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Pega o estágio inicial do funil atual se for criação
     const currentStageId = activeFunnel?.stages[0]?.id;
 
     if (!activeFunnelId || (!editingDeal && !currentStageId)) {
@@ -262,9 +272,12 @@ export default function Deals() {
           probability: Number(formData.probability),
           dueDate: formData.expectedClose,
           contactId: formData.contactId,
+          ownerId: formData.ownerId, // Atualiza dono
         });
 
-        // Atualiza contexto visual
+        // Encontra o objeto do novo dono para atualizar visualmente
+        const newOwner = users.find(u => u.id === formData.ownerId);
+
         updateDeal(editingDeal.id, {
           title: formData.title,
           description: formData.description,
@@ -272,6 +285,9 @@ export default function Deals() {
           probability: Number(formData.probability),
           contactId: formData.contactId,
           expectedClose: new Date(formData.expectedClose),
+          // @ts-ignore
+          ownerId: formData.ownerId,
+          owner: newOwner
         });
       } else {
         // --- CRIAR ---
@@ -284,9 +300,11 @@ export default function Deals() {
           stageId: currentStageId!,
           contactId: formData.contactId,
           dueDate: formData.expectedClose,
+          ownerId: formData.ownerId, // Define dono na criação
         });
 
-        // Adiciona ao contexto visual
+        const ownerObj = users.find(u => u.id === newDeal.ownerId);
+
         addDeal({
           id: newDeal.id,
           title: newDeal.title,
@@ -298,6 +316,9 @@ export default function Deals() {
           funnelId: newDeal.pipelineId,
           expectedClose: new Date(newDeal.dueDate),
           createdAt: new Date(),
+          // @ts-ignore
+          ownerId: newDeal.ownerId,
+          owner: ownerObj || newDeal.owner
         } as any);
       }
 
@@ -308,7 +329,6 @@ export default function Deals() {
     }
   };
 
-  // Drag and Drop de Cards (Kanban)
   const handleDragStart = (dealId: string, stageId: string) => {
     setDraggedDeal(dealId);
     setDragSource({ stageId, funnelId: activeFunnelId });
@@ -317,34 +337,26 @@ export default function Deals() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
-
   const handleDrop = async (targetStageId: string) => {
     if (draggedDeal && dragSource) {
-      // 1. Atualização Otimista no Front (Move visualmente na hora)
       moveDeal(draggedDeal, targetStageId, activeFunnelId);
-
-      // 2. Chama API para salvar
       try {
         await updateOpportunityService(draggedDeal, {
           stageId: targetStageId,
         });
       } catch (error) {
         console.error('Erro ao mover card:', error);
-        alert('Erro ao salvar movimento. Recarregue a página.');
       }
-
       setDraggedDeal(null);
       setDragSource(null);
     }
   };
 
-  // Excluir Oportunidade
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir?')) return;
-
     try {
       await deleteOpportunityService(id);
-      deleteDeal(id); // Remove do contexto visual
+      deleteDeal(id);
       setShowDetailsModal(false);
       setShowModal(false);
     } catch (error) {
@@ -353,7 +365,6 @@ export default function Deals() {
     }
   };
 
-  // --- HELPER FUNCTIONS ---
   const getStageDeals = (stageId: string) =>
     funnelDeals.filter((d) => d.stage === stageId);
   const getStageTotal = (stageId: string) =>
@@ -368,6 +379,8 @@ export default function Deals() {
         description: deal.description || '',
         value: deal.value,
         contactId: deal.contactId,
+        // @ts-ignore
+        ownerId: deal.ownerId || deal.owner?.id || '',
         probability: deal.probability,
         expectedClose: new Date(deal.expectedClose).toISOString().split('T')[0],
       });
@@ -378,6 +391,7 @@ export default function Deals() {
         description: '',
         value: 0,
         contactId: '',
+        ownerId: '', 
         probability: 50,
         expectedClose: '',
       });
@@ -391,7 +405,7 @@ export default function Deals() {
   };
 
   const openEditModal = (deal: Deal) => {
-    openModal(deal); // Reutiliza a lógica de abrir modal de edição
+    openModal(deal);
     setShowDetailsModal(false);
   };
 
@@ -438,7 +452,7 @@ export default function Deals() {
 
       {/* --- KANBAN BOARD --- */}
       {activeFunnel && (
-        <div className="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-200px)]">
+        <div className="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-260px)]">
           {activeFunnel.stages.map((stage) => {
             const stageDealsList = getStageDeals(stage.id);
             const stageTotal = getStageTotal(stage.id);
@@ -471,6 +485,9 @@ export default function Deals() {
                     const contact = contacts.find(
                       (c) => c.id === deal.contactId,
                     );
+                    // @ts-ignore
+                    const ownerName = deal.owner?.name;
+
                     return (
                       <div
                         key={deal.id}
@@ -481,9 +498,18 @@ export default function Deals() {
                         onDragStart={() => handleDragStart(deal.id, stage.id)}
                         onClick={() => openDetailsModal(deal)}
                       >
-                        <h4 className="font-medium mb-2 text-sm line-clamp-2">
-                          {deal.title}
-                        </h4>
+                        <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium text-sm line-clamp-2 flex-1">
+                              {deal.title}
+                            </h4>
+                            {/* --- AVATAR NO CARD --- */}
+                            {ownerName && (
+                                <div className="ml-2">
+                                    {renderUserAvatar(ownerName, "w-6 h-6", "text-[10px]")}
+                                </div>
+                            )}
+                        </div>
+
                         <p
                           className="text-lg font-bold mb-3"
                           style={{ color: stage.color }}
@@ -551,6 +577,20 @@ export default function Deals() {
             </div>
 
             <div className="space-y-6">
+              {/* --- INFO DO RESPONSÁVEL NO DETALHE --- */}
+              {/* @ts-ignore */}
+              {selectedDeal.owner && (
+                 <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border">
+                    {/* @ts-ignore */}
+                    {renderUserAvatar(selectedDeal.owner.name, "w-8 h-8", "text-sm")}
+                    <div>
+                        <p className="text-xs text-muted-foreground font-bold uppercase">Responsável</p>
+                        {/* @ts-ignore */}
+                        <p className="text-sm font-medium">{selectedDeal.owner.name}</p>
+                    </div>
+                 </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-secondary p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1 font-medium">
@@ -710,26 +750,49 @@ export default function Deals() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Contato
-                </label>
-                <select
-                  className="input"
-                  value={formData.contactId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, contactId: e.target.value })
-                  }
-                  
-                >
-                  <option value="">Selecione um contato</option>
-                  {contacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Contato
+                    </label>
+                    <select
+                      className="input"
+                      value={formData.contactId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, contactId: e.target.value })
+                      }
+                      
+                    >
+                      <option value="">Selecione um contato</option>
+                      {contacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* --- SELETOR DE RESPONSÁVEL --- */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Responsável
+                    </label>
+                    <select
+                      className="input"
+                      value={formData.ownerId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, ownerId: e.target.value })
+                      }
+                    >
+                      <option value="">Selecione o dono</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Previsão de Fechamento

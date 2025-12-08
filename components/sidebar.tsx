@@ -17,17 +17,9 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   ];
 
   return (
-    <aside className=" flex flex-col gap-2 justify-center">
-      <div className="p-4">
-        <div className="flex items-center justify-center">
-          <div className="w-12 h-12 flex ">
-            <img className="w-full h-auto" src="/gtech.svg" alt="logo gtech" />
-          </div>
-        </div>
-      </div>
-
-      <nav className="flex-1 p-4">
-        <ul className="flex flex-col gap-2">
+    <aside className=" flex flex-col gap-2 justify-center navbar">
+      <nav className="flex-1 sm:p-3 p-1">
+        <ul className="flex flex-row sm:flex-col gap-2">
           {menuItems.map((item) => (
             <li key={item.id}>
               <button
@@ -36,7 +28,9 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                   activeTab === item.id ? 'active' : ''
                 }`}
               >
-                <span className="text-xl flex justify-center items-center">{item.icon}</span>
+                <span className="text-xl flex justify-center items-center">
+                  {item.icon}
+                </span>
               </button>
             </li>
           ))}

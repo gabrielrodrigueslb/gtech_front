@@ -4,16 +4,23 @@ export interface Opportunity {
   id: string;
   title: string;
   description?: string;
-  value: number; // No banco é 'amount'
-  amount?: number; // Compatibilidade caso venha do back
+  value: number; 
+  amount?: number; 
   probability: number;
-  stageId?: string; // Para envio
-  stage?: { id: string; name: string; color: string }; // Para recebimento
+  stageId?: string; 
+  stage?: { id: string; name: string; color: string }; 
   pipelineId: string;
   contactId?: string;
-  contacts?: { id: string; name: string }[]; // O back retorna array de contatos
+  contacts?: { id: string; name: string }[];
+  
+  // --- NOVOS CAMPOS ADICIONADOS ---
+  ownerId?: string; // ID do responsável
+  owner?: { id: string; name: string }; // Objeto para exibir o avatar
+  // --------------------------------
+  
   expectedClose?: string;
-  dueDate?: string; // No banco é dueDate
+  dueDate?: string; 
+  createdAt?: string | Date;
 }
 
 // Buscar oportunidades por Pipeline (Funil)
@@ -32,12 +39,13 @@ export async function createOpportunity(data: {
   stageId: string;
   contactId?: string;
   dueDate?: string;
+  ownerId?: string; // <--- ADICIONADO AQUI TAMBÉM
 }) {
   const { data: response } = await api.post('/opportunities/createOpportunity', data);
   return response;
 }
 
-// Atualizar oportunidade (incluindo mover de estágio)
+// Atualizar oportunidade
 export async function updateOpportunity(id: string, data: Partial<Opportunity> & { stageId?: string }) {
   const { data: response } = await api.put(`/opportunities/${id}`, data);
   return response;

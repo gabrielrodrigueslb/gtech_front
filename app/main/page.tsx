@@ -89,13 +89,23 @@ export default function CRMApp() {
   return (
     <CRMProvider>
       <div className="flex min-h-screen gap-2">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        <main className="flex-1 p-7 flex flex-col overflow-auto min-h-full w-full ">
-          <header className="flex justify-end pb-4">
+        <main className=" flex-1 px-6 py-2 flex flex-col min-h-full w-full max-h-screen overflow-auto sm:overflow-hidden">
+          <header className="flex justify-between pb-2 items-center">
+            <div className="p-4">
+              <div className="flex items-center justify-center">
+                <div className="w-12 h-12 flex ">
+                  <img
+                    className="w-full h-auto"
+                    src="/gtech.svg"
+                    alt="logo gtech"
+                  />
+                </div>
+              </div>
+            </div>
             <div className="user-infos flex items-center gap-4 ">
               <span className="flex items-center justify-center h-full font-bold">
-                  {user?.name}
-                </span>
+                {user?.name}
+              </span>
               <div
                 className="h-12 w-12 bg-amber-400 rounded-full relative cursor-pointer"
                 onClick={toggleMenu}
@@ -129,7 +139,10 @@ export default function CRMApp() {
               </div>
             </div>
           </header>
-          {renderContent()}
+          <section className="flex sm:flex-row flex-col gap-4 h-full overflow-auto sm:overflow-hidden section-content">
+            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+            <div className="w-full">{renderContent()}</div>
+          </section>
         </main>
       </div>
     </CRMProvider>

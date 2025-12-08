@@ -3,7 +3,8 @@
 @theme inline {
   --color-background: linear-gradient(121.09deg, #11182b 0%, #280f0f 100%);
   --color-foreground: #f5f5f7;
-  --color-card: rgba(60, 57, 57, 20%);
+  --color-card: rgba(60, 57, 57, 0.2);
+  --color-card-blur: rgba(60, 57, 57, 0.15);
   --color-card-hover: #1c1c24;
   --color-border: #2a2a35;
   --color-muted: #6b6b7b;
@@ -537,10 +538,29 @@ body {
   }
 }
 
-.profile-menu-link{
-  &:hover{
+.profile-menu-link {
+  &:hover {
     background-color: var(--color-card);
     transition: all 0.2s ease;
     width: 100%;
+  }
+}
+@media (max-width: 640px) {
+  .section-content {
+    padding-bottom: 90px;
+  }
+
+  .navbar {
+    z-index: 20;
+    background: var(--color-card);
+    backdrop-filter: blur(20px) ;
+    -webkit-backdrop-filter: blur(20px) ;
+    border: 1px solid var(--color-border);
+    border-radius: 220px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    margin-inline: 20px;
+    bottom: 10;
   }
 }
