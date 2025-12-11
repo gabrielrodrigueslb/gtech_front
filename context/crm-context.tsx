@@ -22,6 +22,9 @@ export interface Deal {
   funnelId: string;
   contactId: string;
   probability: number;
+  contactNumber?: string;
+  website?: string;
+  address?: string;
   expectedClose: Date;
   createdAt: Date;
   description?: string;
@@ -133,6 +136,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       funnelId: dealData.funnelId || '1',
       contactId: dealData.contactId || '',
       probability: dealData.probability || 0,
+      contactNumber: dealData.contactNumber || '',
+      website: dealData.website || '',
+      address: dealData.address || '',
       expectedClose: dealData.expectedClose || new Date(),
       // Garante que o owner venha junto se existir
       ownerId: dealData.ownerId,

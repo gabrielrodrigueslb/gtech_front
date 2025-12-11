@@ -129,7 +129,7 @@ export default function Dashboard() {
                   style={{ backgroundColor: "hsl(var(--secondary))" }}
                 >
                   <div
-                    className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0"
+                    className="w-3 h-3 rounded-full mt-1.5 shrink-0"
                     style={{ backgroundColor: `hsl(${priorityColors[task.priority]})` }}
                   />
                   <div className="flex-1">

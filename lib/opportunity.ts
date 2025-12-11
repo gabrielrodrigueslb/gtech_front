@@ -10,6 +10,9 @@ export interface Opportunity {
   stageId?: string; 
   stage?: { id: string; name: string; color: string }; 
   pipelineId: string;
+  contactNumber?: string,
+  website?:string,
+  address?:string,
   contactId?: string;
   contacts?: { id: string; name: string }[];
   
@@ -38,6 +41,9 @@ export async function createOpportunity(data: {
   pipelineId: string;
   stageId: string;
   contactId?: string;
+  contactNumber?: number,
+  website?:string,
+  address?:string,
   dueDate?: string;
   ownerId?: string; // <--- ADICIONADO AQUI TAMBÉM
 }) {
