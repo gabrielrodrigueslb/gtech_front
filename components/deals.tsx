@@ -407,20 +407,26 @@ export default function Deals() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div><h1 className="text-4xl font-bold mb-2">CRM</h1></div>
         </div>
-        <div className="flex gap-2 justify-between pb-2 w-full">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {funnels.map((funnel) => (
-              <button
-                key={funnel.id}
-                onClick={() => setActiveFunnelId(funnel.id)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
-                  activeFunnelId === funnel.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground hover:bg-muted'
-                }`}
-              >
-                {funnel.name}
-              </button>
-            ))}
-            <button onClick={() => setShowFunnelModal(true)} className="px-4 py-2 rounded-lg font-medium bg-secondary text-foreground hover:bg-muted transition-all whitespace-nowrap">
+        <div className="pipeline-buttons flex sm:flex-row flex-col gap-2 justify-between pb-2 w-full">
+          <div className="flex gap-2">
+            <select
+              className="pipeline-options px-4 py-3 bg-(--color-card) text-md border-(--color-border) border-2 rounded-xl cursor-pointer outline-0 font-bold"
+              name="Pipelines"
+              id="pipelines"
+              value={activeFunnelId}
+              onChange={(e) => setActiveFunnelId(e.target.value)}
+            >
+              {funnels.map((funnel) => (
+                <option
+                  key={funnel.id}
+                  value={funnel.id}
+                  className="cursor-pointer bg-gray-700"
+                >
+                  {funnel.name}
+                </option>
+              ))}
+            </select>
+            <button onClick={() => setShowFunnelModal(true)} className="new-pipeline px-4 py-2 rounded-lg font-medium bg-secondary text-foreground hover:bg-muted transition-all whitespace-nowrap">
               + Novo Funil
             </button>
           </div>

@@ -1,13 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginRequest } from '@/lib/auth';
+import { getMe, loginRequest } from '@/lib/auth';
 
 export default function Login() {
   const router = useRouter();
 
-  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -84,7 +83,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
-              placeholder="••••••••"
+              placeholder="Senha"
             />
           </div>
 

@@ -41,12 +41,12 @@ export default function CRMApp() {
   }, [router]);
 
   async function handleLogout() {
-    await fetch('http://localhost:3333/api/auth/logout', {
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     });
 
-    router.push('/');
+    router.replace('/');
   }
 
   const renderContent = () => {
