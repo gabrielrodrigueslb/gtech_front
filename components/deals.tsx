@@ -12,6 +12,7 @@ import {
   updateOpportunity as updateOpportunityService,
   deleteOpportunity as deleteOpportunityService,
 } from '@/lib/opportunity';
+import { FaRegUser } from "react-icons/fa6";
 import { getUsers, type User } from '@/lib/user';
 import { getContacts, type Contact as ContactType } from '@/lib/contact';
 import { useCRM, type Deal } from '@/context/crm-context';
@@ -628,7 +629,7 @@ export default function Deals() {
                 ✕
               </button>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* @ts-ignore */}
               {selectedDeal.owner && (
                 <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border">
@@ -647,6 +648,31 @@ export default function Deals() {
                       {selectedDeal.owner.name}
                     </p>
                   </div>
+                </div>
+              )}
+              {selectedDeal.contactId && (
+                <div className=" p-3 
+                bg-secondary/30 rounded-lg border border-border flex gap-2">
+                  <div className='w-8 h-8 rounded-full bg-border text-secondary/30 flex justify-center items-center text-sm'> <FaRegUser /></div>
+                  <div> <p className="text-xs text-muted-foreground font-bold">
+                    CONTATO
+                  </p>
+                  <p className="text-sm font-medium">
+                    {availableContacts.find(
+                      (c) => c.id === selectedDeal.contactId,
+                    )?.name || 'Sem contato'}
+                  </p></div>
+                 
+                </div>
+              )}
+              {selectedDeal.description && (
+                <div className="bg-secondary p-4 pb-0 rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">
+                    DESCRIÇÃO
+                  </p>
+                  <p className="text-sm font-medium">
+                    {selectedDeal.description}
+                  </p>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
@@ -670,14 +696,6 @@ export default function Deals() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-secondary p-4 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1 font-medium">
-                    VALOR
-                  </p>
-                  <p className="text-sm font-medium">
-                    R$ {selectedDeal.value.toLocaleString()}
-                  </p>
-                </div>
                 <div className="bg-secondary p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1 font-medium">
                     NÚMERO DE CONTATO
@@ -717,8 +735,8 @@ export default function Deals() {
                       )}
                     </p>
                   </div>
+                  
                 </div>
-
                 <div className="bg-secondary p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1 font-medium">
                     ENDEREÇO
@@ -729,19 +747,7 @@ export default function Deals() {
                     </p>
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-secondary p-4 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-2 font-medium">
-                    CONTATO
-                  </p>
-                  <p className="text-sm font-medium">
-                    {availableContacts.find(
-                      (c) => c.id === selectedDeal.contactId,
-                    )?.name || 'Sem contato'}
-                  </p>
-                </div>
-                <div className="bg-secondary p-4 rounded-lg">
+                 <div className="bg-secondary p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-2 font-medium ">
                     PREVISÃO
                   </p>
@@ -752,16 +758,7 @@ export default function Deals() {
                   </p>
                 </div>
               </div>
-              {selectedDeal.description && (
-                <div className="bg-secondary p-4 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-2 font-medium">
-                    DESCRIÇÃO
-                  </p>
-                  <p className="text-sm text-foreground bg-secondary p-3 rounded-lg">
-                    {selectedDeal.description}
-                  </p>
-                </div>
-              )}
+                                     
               <div className="flex gap-3 pt-4 border-t">
                 <button
                   className="btn btn-ghost text-destructive flex-1 hover:text-red-400"
