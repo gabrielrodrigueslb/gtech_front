@@ -181,6 +181,9 @@ export default function Deals() {
           probability: d.probability,
           contactId: d.contacts?.[0]?.id || '',
           ownerId: d.owner?.id,
+          website:d.website,
+          contactNumber:d.contactNumber,
+          address:d.address,
           owner: d.owner,
           stage: d.stageId || d.stage?.id,
           funnelId: d.pipelineId,
@@ -452,6 +455,8 @@ export default function Deals() {
     setShowDetailsModal(false);
   };
 
+  console.log(selectedDeal)
+
   // --- RENDER ---
   return (
     <div className="w-full">
@@ -708,6 +713,7 @@ export default function Deals() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium">
                       {selectedDeal.address || 'Sem endereço'}
+                      
                     </p>
                   </div>
                 </div>

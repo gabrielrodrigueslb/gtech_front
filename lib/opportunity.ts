@@ -41,7 +41,7 @@ export async function createOpportunity(data: {
   pipelineId: string;
   stageId: string;
   contactId?: string;
-  contactNumber?: number,
+  contactNumber?: string,
   website?:string,
   address?:string,
   dueDate?: string;
