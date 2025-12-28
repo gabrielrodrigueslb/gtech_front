@@ -19,7 +19,7 @@ export async function createPipeline(name: string, stages?: { name: string, colo
   return data;
 }
 
-export async function updatePipeline(id: string, name: string) {
+export async function updatePipeline(id: string, name: string, funnelStages: { id?: string; name: string; color: string; }[]) {
   const { data } = await api.put(`/crm/updatePipeline/${id}`, { name });
   return data;
 }

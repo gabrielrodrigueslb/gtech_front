@@ -74,7 +74,8 @@ interface CRMContextType {
   addDeal: (deal: Partial<Deal> & { title: string }) => void;
   updateDeal: (id: string, deal: Partial<Deal>) => void;
   deleteDeal: (id: string) => void;
-  moveDeal: (id: string, stageId: string, funnelId: string) => void;
+  moveDeal: (id: string, stageId: string) => void;
+
 
   addTask: (task: Partial<Task> & { title: string }) => void;
   updateTask: (id: string, task: Partial<Task>) => void;
@@ -166,11 +167,15 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     setDeals(deals.filter((d) => d.id !== id));
   };
 
-  const moveDeal = (id: string, stageId: string, funnelId: string) => {
-    setDeals(
-      deals.map((d) => (d.id === id ? { ...d, stage: stageId, funnelId } : d)),
-    );
-  };
+  const moveDeal = (id: string, stageId: string) => {
+  setDeals((prev) =>
+    prev.map((d) =>
+      d.id === id
+        ? { ...d, stage: stageId }
+        : d
+    ),
+  );
+};
 
   const addTask = (taskData: Partial<Task> & { title: string }) => {
     const newTask = {

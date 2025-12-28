@@ -2,7 +2,7 @@
 import { MdLeaderboard } from 'react-icons/md';
 import { TiContacts } from 'react-icons/ti';
 import { LuLayoutDashboard } from "react-icons/lu";
-import { GoGraph } from "react-icons/go";
+import { FaBuildingUser } from "react-icons/fa6";
 import { FaTasks } from "react-icons/fa";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -20,8 +20,9 @@ console.log(pathname)
   const menuItems = [
     { id:1, path: '/main/dashboard', label: 'Dashboard', icon: <LuLayoutDashboard /> },
     { id:2, path: '/main/contacts', label: 'Contatos', icon: <TiContacts /> },
-    { id:3, path: '/main/crm', label: 'Negócios', icon: <MdLeaderboard /> },
-    { id:4, path: '/main/tasks', label: 'Tarefas', icon: <FaTasks /> }
+    { id:3, path: '/main/clientes', label: 'Clientes', icon: <FaBuildingUser /> },
+    { id:4, path: '/main/crm', label: 'Negócios', icon: <MdLeaderboard /> },
+    { id:5, path: '/main/tasks', label: 'Tarefas', icon: <FaTasks /> }
   ];
 
   return (
