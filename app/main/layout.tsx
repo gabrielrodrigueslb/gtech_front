@@ -5,6 +5,15 @@ import Sidebar from '@/components/sidebar';
 import { CRMProvider } from '@/context/crm-context';
 import './main.scss'
 
+export const viewport = {
+  themeColor: '#11182b',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
+
 export default function MainLayout({
   children,
 }: {
