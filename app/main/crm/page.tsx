@@ -770,14 +770,14 @@ export default function Deals() {
                             }}
                           />
                           <div className="flex justify-between items-start gap-2 mb-3">
-                            <h4 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+                            <h4 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors select-none">
                               {deal.title}
                             </h4>
-                            <button className="text-muted-foreground/40 hover:text-foreground p-1 -mr-1 transition-colors">
+                            <button className="text-muted-foreground/40 hover:text-foreground p-1 -mr-1 transition-colors cursor-pointer">
                               <FaEllipsisV size={12} />
                             </button>
                           </div>
-                          <div className="flex items-baseline gap-1 mb-4">
+                          <div className="flex items-baseline gap-1 mb-4 select-none">
                             <span className="text-xs text-muted-foreground font-medium">
                               R$
                             </span>
@@ -785,12 +785,12 @@ export default function Deals() {
                               {deal.value.toLocaleString('pt-BR')}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between gap-2 mt-auto">
+                          <div className="flex items-center justify-between gap-2 mt-auto select-none">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <div className="bg-muted p-1 rounded text-muted-foreground">
                                 <FaRegUser size={10} />
                               </div>
-                              <span className="text-[11px] font-medium text-muted-foreground truncate">
+                              <span className="text-[11px] font-medium text-muted-foreground truncate select-none">
                                 {contact?.name || 'Sem contato'}
                               </span>
                             </div>
@@ -995,8 +995,8 @@ export default function Deals() {
       {/* --- OUTROS MODAIS --- */}
       {showDetailsModal && selectedDeal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-card w-full max-w-2xl rounded-2xl shadow-2xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-border">
+          <div className="bg-card w-full max-w-2xl max-h-screen rounded-2xl shadow-2xl border border-border overflow-y-auto animate-in zoom-in-95 duration-200 ">
+            <div className="flex items-center justify-between p-6 border-b border-border ">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   <FaDollarSign size={24} />

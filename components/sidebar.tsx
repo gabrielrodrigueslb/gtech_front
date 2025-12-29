@@ -27,7 +27,7 @@ console.log(pathname)
 
   return (
     <aside className=" flex flex-col gap-2 justify-center navbar">
-      <nav className="flex-1 sm:p-3 p-1">
+      <nav className="flex-1 sm:p-3 p-2 ">
         <ul className="flex flex-row sm:flex-col gap-2 justify-between">
 
           {menuItems.map((item) => (
