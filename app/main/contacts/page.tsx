@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { getContacts, createContact, updateContact, deleteContact, type Contact } from "@/lib/contact"
+import { RiContactsBook3Fill } from "react-icons/ri";
 
 export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -122,9 +123,16 @@ export default function Contacts() {
   return (
     <div>
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Contatos</h1>
-          <p style={{ color: "var(--color-muted-foreground)" }}>Gerencie seus contatos e leads</p>
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 p-2 rounded-lg">
+            <RiContactsBook3Fill className="text-primary text-2xl" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Contatos</h1>
+            <p className="text-sm text-muted-foreground">
+              Gerencie seus contatos e leads
+            </p>
+          </div>
         </div>
         <button className="btn btn-primary" onClick={() => openModal()}>
           + Novo Contato

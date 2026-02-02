@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   getPipelines,
@@ -710,7 +711,7 @@ export default function Deals() {
         ) : activeFunnel ? (
           <div
             ref={boardRef}
-            className="flex h-full gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
+            className="flex h-full gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent scrollbar-background-transparent"
             onDragOver={handleAutoScroll}
           >
             {activeFunnel.stages.map((stage) => {

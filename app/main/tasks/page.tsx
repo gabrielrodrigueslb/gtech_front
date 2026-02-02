@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { useCRM, type Task } from "@/context/crm-context"
+import { FaTasks } from "react-icons/fa";
 
 export default function Tasks() {
   const { tasks, contacts, deals, addTask, updateTask, deleteTask } = useCRM()
@@ -96,9 +97,16 @@ export default function Tasks() {
   return (
     <div>
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">Tarefas</h1>
-          <p style={{ color: "var(--color-muted-foreground)" }}>Gerencie suas atividades e compromissos</p>
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 p-2 rounded-lg">
+            <FaTasks className="text-primary text-2xl" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Tarefas</h1>
+            <p className="text-sm text-muted-foreground">
+              Gerencie suas atividades e compromissos
+            </p>
+          </div>
         </div>
         <button className="btn btn-primary" onClick={() => openModal()}>
           + Nova Tarefa

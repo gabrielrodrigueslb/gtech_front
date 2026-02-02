@@ -1,6 +1,7 @@
 "use client"
 
 import { useCRM } from "@/context/crm-context"
+import { LuLayoutDashboard } from "react-icons/lu";
 
 export default function Dashboard() {
   const { contacts, deals, tasks } = useCRM()
@@ -28,10 +29,17 @@ export default function Dashboard() {
   return (
     <div className="">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-color-text" style={{ color: "hsl(var(--foreground))" }}>
-          Dashboard
-        </h1>
-        <p style={{ color: "hsl(var(--muted-foreground))" }}>Visão geral do seu CRM</p>
+        <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-lg">
+                    <LuLayoutDashboard className="text-primary text-2xl" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+                    <p className="text-sm text-muted-foreground">
+                      Visão geral do seu CRM
+                    </p>
+                  </div>
+                </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

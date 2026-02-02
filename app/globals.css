@@ -384,3 +384,24 @@ select.input {
     opacity: 1;
   }
 }
+
+
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent; /* remove o branco */
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #2a2a2a; /* cor do scroll */
+  border-radius: 999px;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
