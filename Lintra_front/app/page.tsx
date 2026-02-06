@@ -4,10 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getMe, loginRequest } from '@/lib/auth';
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-
 export default function Login() {
   const router = useRouter();
 
