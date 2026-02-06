@@ -41,12 +41,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <head>
-        <meta
-          name="google-site-verification"
-          content="Livqowmo0Ajv9D6E0i5wyzParTYzc6r9pS6noxyZ0WE"
-        />
-      </head>
       <body className={`${inter.className} antialiased `}>
         <PWARegister />
         {children}
