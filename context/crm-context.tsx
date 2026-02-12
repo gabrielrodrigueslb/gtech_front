@@ -25,6 +25,14 @@ export interface Deal {
   contactNumber?: string;
   website?: string;
   address?: string;
+  clientRole?: string;
+  clientName?: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  enderecoCliente?: string;
+  redesSocial1?: string;
+  redesSocial2?: string;
+  linksExtras?: string[];
   expectedClose: Date;
   createdAt: Date;
   description?: string;
@@ -140,6 +148,14 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       contactNumber: dealData.contactNumber || '',
       website: dealData.website || '',
       address: dealData.address || '',
+      clientRole: dealData.clientRole || '',
+      clientName: dealData.clientName || '',
+      clientPhone: dealData.clientPhone || '',
+      clientEmail: dealData.clientEmail || '',
+      enderecoCliente: dealData.enderecoCliente || '',
+      redesSocial1: dealData.redesSocial1 || '',
+      redesSocial2: dealData.redesSocial2 || '',
+      linksExtras: dealData.linksExtras || [],
       expectedClose: dealData.expectedClose || new Date(),
       // Garante que o owner venha junto se existir
       ownerId: dealData.ownerId,

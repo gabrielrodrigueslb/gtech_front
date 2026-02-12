@@ -1,6 +1,7 @@
-import Header from '@/components/header';
+﻿import Header from '@/components/header';
 import Sidebar from '@/components/sidebar';
 import { CRMProvider } from '@/context/crm-context';
+import { FunnelProvider } from '@/context/funnel-context';
 
 export const viewport = {
   themeColor: '#11182b',
@@ -21,15 +22,17 @@ export default function MainLayout({
         duration-300 ease-in-out"
     >
 
-      {/* CONTEÚDO ABAIXO DO HEADER */}
+      {/* CONTEÃšDO ABAIXO DO HEADER */}
       <main className="flex flex-1  min-h-0">
-        {/* SIDEBAR */}
-        <Sidebar />
+        <FunnelProvider>
+          {/* SIDEBAR */}
+          <Sidebar />
 
-        {/* ÁREA DAS PÁGINAS */}
-        <div className="flex-1 overflow-auto min-h-0 p-4 section-content">
-          <CRMProvider>{children}</CRMProvider>
-        </div>
+          {/* ÃREA DAS PÃGINAS */}
+          <div className="flex-1 overflow-auto min-h-0 p-4 section-content">
+            <CRMProvider>{children}</CRMProvider>
+          </div>
+        </FunnelProvider>
       </main>
     </div>
   );

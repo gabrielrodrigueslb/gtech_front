@@ -1,10 +1,9 @@
-'use client';
+﻿'use client';
 
 import type React from 'react';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  getPipelines,
   createPipeline as createPipelineService,
   updatePipeline as updatePipelineService,
   deletePipeline as deletePipelineService,
@@ -21,56 +20,81 @@ import {
   FaEllipsisV,
   FaTrash,
   FaEdit,
-  FaCalendarAlt,
-  FaDollarSign,
-  FaGlobe,
-  FaMapMarkerAlt,
-  FaPhone,
   FaChevronDown,
-  FaCheck,
   FaExclamationTriangle,
 } from 'react-icons/fa';
 import { FaRegAddressCard } from 'react-icons/fa6';
+
 import { GrView } from 'react-icons/gr';
 import { getUsers, type User } from '@/lib/user';
 import { getContacts, type Contact as ContactType } from '@/lib/contact';
+import { formatPhoneNumber } from '@/lib/utils';
 import { useCRM, type Deal } from '@/context/crm-context';
+import { useFunnel } from '@/context/funnel-context';
+import DetailsModal from './components/detailsModal';
+
+type DetailsFormData = {
+  title: string;
+  description: string;
+  value: number;
+  contactId: string;
+  contactNumber: string;
+  website: string;
+  address: string;
+  clientRole: string;
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+  enderecoCliente: string;
+  redesSocial1: string;
+  redesSocial2: string;
+  linksExtras: string[];
+  ownerId: string;
+  probability: number;
+  expectedClose: string;
+  stageId: string;
+};
 
 export default function Deals() {
   const {
     deals,
-    funnels,
     addDeal,
     updateDeal,
     deleteDeal,
     moveDeal,
+  } = useCRM();
+
+  const {
+    funnels,
+    activeFunnel,
+    activeFunnelId,
+    setActiveFunnelId,
+    isLoadingFunnels,
     addFunnel,
     updateFunnel,
     deleteFunnel,
-  } = useCRM();
+  } = useFunnel();
 
   // --- ESTADOS GERAIS ---
-  const [activeFunnelId, setActiveFunnelId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
   const [showFunnelModal, setShowFunnelModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showDetailsContact, setShowDetailsContact] = useState(false);
   const [showDeleteFunnelModal, setShowDeleteFunnelModal] = useState(false);
   const [funnelToDelete, setFunnelToDelete] = useState<{
     id: string;
     name: string;
   } | null>(null);
 
-  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [editingFunnelId, setEditingFunnelId] = useState<string | null>(null);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRef = useRef<number | null>(null);
 
-  const SCROLL_EDGE_SIZE = 80; // px de distância da borda
+  const SCROLL_EDGE_SIZE = 80; // px de distÃ¢ncia da borda
   const SCROLL_SPEED = 12; // velocidade do scroll
 
   // --- DADOS REAIS ---
@@ -112,7 +136,7 @@ export default function Deals() {
     }
   };
 
-  // --- ESTADOS DO FORMULÁRIO ---
+  // --- ESTADOS DO FORMULÃRIO ---
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -121,10 +145,68 @@ export default function Deals() {
     contactNumber: '',
     website: '',
     address: '',
+    clientRole: '',
+    clientName: '',
+    clientPhone: '',
+    clientEmail: '',
+    enderecoCliente: '',
+    redesSocial1: '',
+    redesSocial2: '',
+    linksExtras: [] as string[],
     ownerId: '',
     probability: 50,
     expectedClose: '',
   });
+
+  const openModal = (deal?: Deal) => {
+    if (deal) {
+      setEditingDeal(deal);
+      const rawNumber = deal.contactNumber ?? '';
+      setFormData({
+        title: deal.title,
+        description: deal.description || '',
+        value: deal.value,
+        contactId: deal.contactId,
+        ownerId: deal.ownerId || deal.owner?.id || '',
+        probability: deal.probability,
+        expectedClose: new Date(deal.expectedClose).toISOString().split('T')[0],
+        contactNumber: rawNumber ? formatPhoneNumber(rawNumber) : '',
+        website: deal.website ?? '',
+        address: deal.address ?? '',
+        clientRole: deal.clientRole ?? '',
+        clientName: deal.clientName ?? '',
+        clientPhone: deal.clientPhone ?? '',
+        clientEmail: deal.clientEmail ?? '',
+        enderecoCliente: deal.enderecoCliente ?? '',
+        redesSocial1: deal.redesSocial1 ?? '',
+        redesSocial2: deal.redesSocial2 ?? '',
+        linksExtras: deal.linksExtras ?? [],
+      });
+    } else {
+      setEditingDeal(null);
+      setFormData({
+        title: '',
+        description: '',
+        value: 0,
+        contactId: '',
+        website: '',
+        contactNumber: '',
+        address: '',
+        clientRole: '',
+        clientName: '',
+        clientPhone: '',
+        clientEmail: '',
+        enderecoCliente: '',
+        redesSocial1: '',
+        redesSocial2: '',
+        linksExtras: [],
+        ownerId: '',
+        probability: 50,
+        expectedClose: new Date().toISOString().split('T')[0],
+      });
+    }
+    setShowModal(true);
+  };
 
   // --- ESTADOS DO FUNIL ---
   const [funnelName, setFunnelName] = useState('');
@@ -153,51 +235,18 @@ export default function Deals() {
     '#EC4899',
     '#6366F1',
   ];
-
-  // --- HELPER: FORMATAÇÃO TELEFONE (REGEX) ---
-  const formatPhoneNumber = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    const limited = numbers.substring(0, 11);
-    if (limited.length <= 10) {
-      return limited.replace(/^(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
-    }
-    return limited.replace(/^(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
-  };
-
   // --- CARREGAMENTO INICIAL ---
   useEffect(() => {
     async function loadAllData() {
       setIsLoading(true);
       try {
-        const [funnelsData, usersData, contactsData] = await Promise.all([
-          getPipelines(),
+        const [usersData, contactsData] = await Promise.all([
           getUsers(),
           getContacts(),
         ]);
 
         setUsers(usersData || []);
         setAvailableContacts(contactsData || []);
-
-        let initialFunnelId = '';
-        if (funnelsData && funnelsData.length > 0) {
-          funnelsData.forEach((pipeline: any) => {
-            const exists = funnels.find((f) => f.id === pipeline.id);
-            if (!exists) {
-              addFunnel({
-                id: pipeline.id,
-                name: pipeline.name,
-                stages: pipeline.stages || [],
-              });
-            }
-          });
-          initialFunnelId = funnelsData[0].id;
-          setActiveFunnelId(initialFunnelId);
-        }
-
-        if (initialFunnelId) {
-          const remoteDeals = await getOpportunities(initialFunnelId);
-          processRemoteDeals(remoteDeals);
-        }
       } catch (error: any) {
         console.error('Erro no carregamento inicial:', error);
       } finally {
@@ -223,6 +272,14 @@ export default function Deals() {
           website: d.website,
           contactNumber: d.contactNumber,
           address: d.address,
+          clientRole: d.clientRole,
+          clientName: d.clientName,
+          clientPhone: d.clientPhone,
+          clientEmail: d.clientEmail,
+          enderecoCliente: d.enderecoCliente,
+          redesSocial1: d.redesSocial1,
+          redesSocial2: d.redesSocial2,
+          linksExtras: d.linksExtras,
           owner: d.owner,
           stage: d.stageId || d.stage?.id,
           funnelId: d.pipelineId,
@@ -244,7 +301,7 @@ export default function Deals() {
       }
     }
     fetchDealsOnTabChange();
-  }, [activeFunnelId]);
+  }, [activeFunnelId, isLoading]);
 
   // Fechar menu ao clicar fora
   useEffect(() => {
@@ -260,10 +317,6 @@ export default function Deals() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const activeFunnel = useMemo(
-    () => funnels.find((f) => f.id === activeFunnelId),
-    [funnels, activeFunnelId],
-  );
   const funnelDeals = useMemo(
     () => deals.filter((d) => d.funnelId === activeFunnelId),
     [deals, activeFunnelId],
@@ -313,7 +366,7 @@ export default function Deals() {
 
   const handleFunnelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!funnelName.trim()) return alert('Nome do funil é obrigatório');
+    if (!funnelName.trim()) return alert('Nome do funil Ã© obrigatÃ³rio');
     if (funnelStages.length === 0)
       return alert('Adicione pelo menos uma etapa');
 
@@ -329,7 +382,7 @@ export default function Deals() {
         updateFunnel(editingFunnelId, {
           id: updatedPipeline.id,
           name: updatedPipeline.name,
-          stages: updatedPipeline.stages,
+          stages: updatedPipeline.stages || [],
         });
       } else {
         const newPipeline = await createPipelineService(
@@ -339,7 +392,7 @@ export default function Deals() {
         addFunnel({
           id: newPipeline.id,
           name: newPipeline.name,
-          stages: newPipeline.stages,
+          stages: newPipeline.stages || [],
         });
         setActiveFunnelId(newPipeline.id);
       }
@@ -363,7 +416,7 @@ export default function Deals() {
   const openEditFunnel = (funnel: any) => {
     setEditingFunnelId(funnel.id);
     setFunnelName(funnel.name);
-    setFunnelStages(funnel.stages);
+    setFunnelStages(funnel.stages || []);
     setShowFunnelModal(true);
     setIsFunnelMenuOpen(false);
   };
@@ -379,10 +432,6 @@ export default function Deals() {
     try {
       await deletePipelineService(funnelToDelete.id);
       deleteFunnel(funnelToDelete.id);
-      if (activeFunnelId === funnelToDelete.id) {
-        const remaining = funnels.filter((f) => f.id !== funnelToDelete.id);
-        setActiveFunnelId(remaining.length > 0 ? remaining[0].id : '');
-      }
       setShowDeleteFunnelModal(false);
       setFunnelToDelete(null);
     } catch (error) {
@@ -410,6 +459,14 @@ export default function Deals() {
           website: formData.website,
           contactNumber: formData.contactNumber.replace(/\D/g, ''),
           address: formData.address,
+          clientRole: formData.clientRole,
+          clientName: formData.clientName,
+          clientPhone: formData.clientPhone,
+          clientEmail: formData.clientEmail,
+          enderecoCliente: formData.enderecoCliente,
+          redesSocial1: formData.redesSocial1,
+          redesSocial2: formData.redesSocial2,
+          linksExtras: formData.linksExtras,
           dueDate: formData.expectedClose,
           contactId: formData.contactId,
           ownerId: formData.ownerId,
@@ -426,6 +483,14 @@ export default function Deals() {
           website: formData.website,
           contactNumber: formData.contactNumber.replace(/\D/g, ''),
           address: formData.address,
+          clientRole: formData.clientRole,
+          clientName: formData.clientName,
+          clientPhone: formData.clientPhone,
+          clientEmail: formData.clientEmail,
+          enderecoCliente: formData.enderecoCliente,
+          redesSocial1: formData.redesSocial1,
+          redesSocial2: formData.redesSocial2,
+          linksExtras: formData.linksExtras,
           expectedClose: new Date(formData.expectedClose),
           ownerId: formData.ownerId,
         } as any);
@@ -438,6 +503,14 @@ export default function Deals() {
           website: formData.website,
           contactNumber: formData.contactNumber.replace(/\D/g, ''),
           address: formData.address,
+          clientRole: formData.clientRole,
+          clientName: formData.clientName,
+          clientPhone: formData.clientPhone,
+          clientEmail: formData.clientEmail,
+          enderecoCliente: formData.enderecoCliente,
+          redesSocial1: formData.redesSocial1,
+          redesSocial2: formData.redesSocial2,
+          linksExtras: formData.linksExtras,
           dueDate: formData.expectedClose,
           contactId: formData.contactId,
           ownerId: formData.ownerId,
@@ -456,6 +529,14 @@ export default function Deals() {
           website: newOpp.website,
           contactNumber: newOpp.contactNumber,
           address: newOpp.address,
+          clientRole: newOpp.clientRole,
+          clientName: newOpp.clientName,
+          clientPhone: newOpp.clientPhone,
+          clientEmail: newOpp.clientEmail,
+          enderecoCliente: newOpp.enderecoCliente,
+          redesSocial1: newOpp.redesSocial1,
+          redesSocial2: newOpp.redesSocial2,
+          linksExtras: newOpp.linksExtras,
           stage: newOpp.stageId,
           funnelId: newOpp.pipelineId,
           expectedClose: new Date(newOpp.dueDate),
@@ -513,47 +594,74 @@ export default function Deals() {
     }
   };
 
-  const openModal = (deal?: Deal) => {
-    if (deal) {
-      setEditingDeal(deal);
-      const rawNumber = deal.contactNumber ?? '';
-      setFormData({
-        title: deal.title,
-        description: deal.description || '',
-        value: deal.value,
-        contactId: deal.contactId,
-        ownerId: deal.ownerId || deal.owner?.id || '',
-        probability: deal.probability,
-        expectedClose: new Date(deal.expectedClose).toISOString().split('T')[0],
-        contactNumber: rawNumber ? formatPhoneNumber(rawNumber) : '',
-        website: deal.website ?? '',
-        address: deal.address ?? '',
-      });
-    } else {
-      setEditingDeal(null);
-      setFormData({
-        title: '',
-        description: '',
-        value: 0,
-        contactId: '',
-        website: '',
-        contactNumber: '',
-        address: '',
-        ownerId: '',
-        probability: 50,
-        expectedClose: new Date().toISOString().split('T')[0],
-      });
-    }
-    setShowModal(true);
-  };
-
   const openDetailsModal = (deal: Deal) => {
     setSelectedDeal(deal);
     setShowDetailsModal(true);
   };
 
-  // Restaurando a função handleModalContact
-  const handleModalContact = () => setShowDetailsContact(!showDetailsContact);
+  const closeDetailsModal = () => setShowDetailsModal(false);
+
+  const handleSaveDetails = async (data: DetailsFormData) => {
+    if (!selectedDeal) return;
+    try {
+      await updateOpportunityService(selectedDeal.id, {
+        title: data.title,
+        description: data.description,
+        amount: Number(data.value),
+        probability: Number(data.probability),
+        website: data.website,
+        contactNumber: data.contactNumber.replace(/\D/g, ''),
+        address: data.address,
+        clientRole: data.clientRole,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        clientEmail: data.clientEmail,
+        enderecoCliente: data.enderecoCliente,
+        redesSocial1: data.redesSocial1,
+        redesSocial2: data.redesSocial2,
+        linksExtras: data.linksExtras,
+        dueDate: data.expectedClose,
+        contactId: data.contactId,
+        ownerId: data.ownerId,
+        stageId: data.stageId || selectedDeal.stage,
+        pipelineId: selectedDeal.funnelId,
+      });
+
+      const updatedOwner = users.find((u) => u.id === data.ownerId);
+      const updatedDeal: Partial<Deal> = {
+        title: data.title,
+        description: data.description,
+        value: Number(data.value),
+        probability: Number(data.probability),
+        contactId: data.contactId,
+        contactNumber: data.contactNumber.replace(/\D/g, ''),
+        website: data.website,
+        address: data.address,
+        clientRole: data.clientRole,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        clientEmail: data.clientEmail,
+        enderecoCliente: data.enderecoCliente,
+        redesSocial1: data.redesSocial1,
+        redesSocial2: data.redesSocial2,
+        linksExtras: data.linksExtras,
+        expectedClose: new Date(data.expectedClose),
+        ownerId: data.ownerId,
+        owner: updatedOwner
+          ? { id: updatedOwner.id, name: updatedOwner.name }
+          : data.ownerId
+            ? { id: data.ownerId, name: selectedDeal.owner?.name || '' }
+            : undefined,
+        stage: data.stageId || selectedDeal.stage,
+      };
+
+      updateDeal(selectedDeal.id, updatedDeal);
+      setSelectedDeal((prev) => (prev ? { ...prev, ...updatedDeal } : prev));
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Erro ao salvar oportunidade');
+      throw error;
+    }
+  };
 
   const renderUserAvatar = (
     name: string,
@@ -574,13 +682,15 @@ export default function Deals() {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background text-foreground">
       {/* --- HEADER --- */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0 ">
         <div className="flex items-center gap-3">
           <div className="bg-primary/10 p-2 rounded-lg">
             <FaRegAddressCard className="text-primary text-2xl" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">CRM Kanban</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              CRM Kanban
+            </h1>
             <p className="text-sm text-muted-foreground">
               Gerencie suas oportunidades de vendas
             </p>
@@ -663,7 +773,7 @@ export default function Deals() {
                             e.stopPropagation();
                             confirmDeleteFunnel(funnel);
                           }}
-                          className="p-1.5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-md transition-colors cursor-pointer  hover:text-red-400"
+                          className="p-1.5 hover:bg-destructive/10 text-muted-foreground rounded-md transition-colors cursor-pointer  hover:text-red-400"
                           title="Excluir"
                         >
                           <FaTrash size={12} />
@@ -701,7 +811,7 @@ export default function Deals() {
 
       {/* --- KANBAN BOARD --- */}
       <main className="flex-1 overflow-hidden min-h-0 relative">
-        {isLoading && (!funnels || funnels.length === 0) ? (
+        { (isLoading || isLoadingFunnels) && (!funnels || funnels.length === 0) ? (
           <div className="absolute inset-0 flex flex-col justify-center items-center backdrop-blur-sm z-10">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
             <span className="text-muted-foreground font-medium">
@@ -711,7 +821,7 @@ export default function Deals() {
         ) : activeFunnel ? (
           <div
             ref={boardRef}
-            className="flex h-full gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent scrollbar-background-transparent"
+            className="flex h-full gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent scrollbar-background-transparent "
             onDragOver={handleAutoScroll}
           >
             {activeFunnel.stages.map((stage) => {
@@ -720,7 +830,7 @@ export default function Deals() {
               return (
                 <div
                   key={stage.id}
-                  className="flex flex-col w-80 min-w-[20rem] bg-card rounded-xl border border-border overflow-hidden"
+                  className="flex flex-col w-80 min-w-[20rem] bg-card rounded-xl border border-border overflow-hidden "
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => handleDrop(stage.id)}
                 >
@@ -852,7 +962,7 @@ export default function Deals() {
               </div>
               <h2 className="text-xl font-bold mb-2">Excluir Funil?</h2>
               <p className="text-muted-foreground text-sm mb-6">
-                Você está prestes a excluir o funil{' '}
+                VocÃª está prestes a excluir o funil{' '}
                 <span className="font-bold text-foreground">
                   "{funnelToDelete.name}"
                 </span>
@@ -995,166 +1105,13 @@ export default function Deals() {
 
       {/* --- OUTROS MODAIS --- */}
       {showDetailsModal && selectedDeal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-card w-full max-w-2xl max-h-screen rounded-2xl shadow-2xl border border-border overflow-y-auto animate-in zoom-in-95 duration-200 ">
-            <div className="flex items-center justify-between p-6 border-b border-border ">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                  <FaDollarSign size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">{selectedDeal.title}</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-muted text-borderborder border-border">
-                      {activeFunnel?.stages.find(
-                        (s) => s.id === selectedDeal.stage,
-                      )?.name || 'Sem estágio'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">•</span>
-                    <span className="text-xs text-muted-foreground">
-                      Criado em{' '}
-                      {new Date(selectedDeal.createdAt).toLocaleDateString(
-                        'pt-BR',
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setEditingDeal(selectedDeal);
-                    openModal(selectedDeal);
-                    setShowDetailsModal(false);
-                  }}
-                  className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground cursor-pointer"
-                >
-                  <FaEdit size={18} />
-                </button>
-                <button
-                  className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground text-xl cursor-pointer"
-                  onClick={() => setShowDetailsModal(false)}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-1 gap-6">
-              <div className="md:col-span-2 space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                    Descrição
-                  </h3>
-                  <p className="text-sm leading-relaxed text-foreground/80 bg-muted/30 p-4 rounded-xl border border-border">
-                    {selectedDeal.description || 'Nenhuma descrição fornecida.'}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl border bg-card border-border shadow-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <FaDollarSign size={12} />
-                      <span className="text-[10px] font-bold uppercase">
-                        Valor
-                      </span>
-                    </div>
-                    <p className="text-lg font-bold">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      }).format(selectedDeal.value)}
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl border bg-card border-border shadow-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <FaCalendarAlt size={12} />
-                      <span className="text-[10px] font-bold uppercase">
-                        Fechamento
-                      </span>
-                    </div>
-                    <p className="text-lg font-bold">
-                      {new Date(selectedDeal.expectedClose).toLocaleDateString(
-                        'pt-BR',
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                    Responsável
-                  </h3>
-                  {selectedDeal.owner ? (
-                    <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl border border-border">
-                      {renderUserAvatar(selectedDeal.owner.name)}
-                      <span className="text-sm font-medium">
-                        {selectedDeal.owner.name}
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">
-                      Nenhum responsável
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                    Contato
-                  </h3>
-                  {selectedDeal.contactId ? (
-                    <div
-                      className="group p-3 bg-muted/30 rounded-xl border border-border hover:border-primary/50 transition-colors cursor-pointer"
-                      onClick={handleModalContact}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <FaRegUser size={14} />
-                          </div>
-                          <span className="text-sm font-medium truncate max-w-[100px]">
-                            {availableContacts.find(
-                              (c) => c.id === selectedDeal.contactId,
-                            )?.name || 'Ver detalhes'}
-                          </span>
-                        </div>
-                        <GrView className="text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">
-                      Sem contato vinculado
-                    </p>
-                  )}
-                </div>
-                <div className='mb-4'>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                    Probabilidade
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span>{selectedDeal.probability}%</span>
-                      <span className="text-muted-foreground">Sucesso</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-1000"
-                        style={{ width: `${selectedDeal.probability}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-muted/20 border-t border-border flex justify-end">
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="px-6 py-2 bg-border text-background rounded-lg font-medium hover:opacity-90 transition-all cursor-pointer"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
+        <DetailsModal
+          selectedDeal={selectedDeal}
+          availableContacts={availableContacts}
+          availableUsers={users}
+          onClose={closeDetailsModal}
+          onSave={handleSaveDetails}
+        />
       )}
 
       {showModal && (
@@ -1177,7 +1134,7 @@ export default function Deals() {
             >
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase text-muted-foreground">
-                  Título da Oportunidade
+                  Tí­tulo da Oportunidade
                 </label>
                 <input
                   type="text"
@@ -1300,6 +1257,146 @@ export default function Deals() {
                   }
                 />
               </div>
+              <div className="pt-2 border-t border-border/60">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-3">
+                  Dados do Cliente
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Nome do Cliente
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      value={formData.clientName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, clientName: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Cargo do Cliente
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      value={formData.clientRole}
+                      onChange={(e) =>
+                        setFormData({ ...formData, clientRole: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Telefone do Cliente
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      value={formData.clientPhone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, clientPhone: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Email do Cliente
+                    </label>
+                    <input
+                      type="email"
+                      className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      value={formData.clientEmail}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          clientEmail: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2 mt-4">
+                  <label className="text-xs font-bold uppercase text-muted-foreground">
+                    Endereço do Cliente
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    value={formData.enderecoCliente}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        enderecoCliente: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/60">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-3">
+                  Redes Sociais
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Rede Social 1
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      value={formData.redesSocial1}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          redesSocial1: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Rede Social 2
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      value={formData.redesSocial2}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          redesSocial2: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/60">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-3">
+                  Links Úteis
+                </h3>
+                <textarea
+                  className="w-full bg-muted/50 border border-border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all min-h-[120px] resize-none"
+                  placeholder="https://exemplo.com\nhttps://outro-link.com"
+                  value={formData.linksExtras.join('\n')}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      linksExtras: e.target.value
+                        .split('\n')
+                        .map((item) => item.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                />
+              </div>
               <div className="pt-4 flex items-center gap-3">
                 {editingDeal && (
                   <button
@@ -1326,104 +1423,6 @@ export default function Deals() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {showDetailsContact && (
-        <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-background/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-border flex items-center justify-between bg-primary/5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <FaRegUser size={20} />
-                </div>
-                <h2 className="text-xl font-bold">Detalhes do Contato</h2>
-              </div>
-              <button
-                onClick={handleModalContact}
-                className="text-muted-foreground hover:text-foreground text-xl"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              {(() => {
-                const contact = availableContacts.find(
-                  (c) => c.id === selectedDeal?.contactId,
-                );
-                if (!contact)
-                  return (
-                    <p className="text-center text-muted-foreground py-8">
-                      Contato não encontrado.
-                    </p>
-                  );
-                return (
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                      <div className="bg-card p-2 rounded-lg shadow-sm text-primary">
-                        <FaRegUser size={16} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
-                          Nome Completo
-                        </p>
-                        <p className="font-semibold">{contact.name}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                        <div className="bg-card p-2 rounded-lg shadow-sm text-primary">
-                          <FaPhone size={16} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
-                            Telefone
-                          </p>
-                          <p className="text-sm font-medium">
-                            {contact.phone || 'Não informado'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                        <div className="bg-card p-2 rounded-lg shadow-sm text-primary">
-                          <FaGlobe size={16} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
-                            Email
-                          </p>
-                          <p className="text-sm font-medium truncate max-w-[120px]">
-                            {contact.email || 'Não informado'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                      <div className="bg-card p-2 rounded-lg shadow-sm text-primary">
-                        <FaMapMarkerAlt size={16} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">
-                          Segmento / Empresa
-                        </p>
-                        <p className="text-sm font-medium">
-                          {contact.segment || 'Não informado'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="p-4 bg-muted/20 border-t flex justify-end">
-              <button
-                onClick={handleModalContact}
-                className="px-6 py-2 bg-card text-background rounded-lg font-medium hover:opacity-90 transition-all"
-              >
-                Entendido
-              </button>
-            </div>
           </div>
         </div>
       )}
