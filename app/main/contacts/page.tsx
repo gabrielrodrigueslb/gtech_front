@@ -1,50 +1,69 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { getContacts, createContact, updateContact, deleteContact, type Contact } from "@/lib/contact"
-import { RiContactsBook3Fill } from "react-icons/ri";
+import { useEffect, useRef, useState } from "react"
+import {
+  createContact,
+  deleteContact,
+  getContacts,
+  updateContact,
+  type Contact,
+} from "@/lib/contact"
+import { RiContactsBook3Fill } from "react-icons/ri"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  
+
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
-  
+
   const [showModal, setShowModal] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
-  
+
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(
+    new Set(),
+  )
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([])
+  const [isDeletingContacts, setIsDeletingContacts] = useState(false)
+  const shiftSelectionRef = useRef(false)
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
-    company: "", 
+    company: "",
     segment: "",
-    status: "lead" as any, 
+    status: "lead" as any,
     notes: "",
   })
 
-  // --- FUNÇÃO AUXILIAR DE FORMATAÇÃO DE TELEFONE ---
   const formatPhoneNumber = (value: string) => {
-    // 1. Remove tudo que não é número
     const numbers = value.replace(/\D/g, "")
-    
-    // 2. Limita a 11 dígitos (DDD + 9 dígitos)
     const limited = numbers.substring(0, 11)
 
-    // 3. Aplica a máscara
-    // Se tiver mais que 10 dígitos, é celular: (99) 99999-9999
-    // Se não, é fixo: (99) 9999-9999
     return limited
-      .replace(/^(\d{2})(\d)/g, "($1) $2") // Coloca parênteses em volta dos dois primeiros dígitos
-      .replace(/(\d)(\d{4})$/, "$1-$2")    // Coloca hífen antes dos últimos 4 dígitos
+      .replace(/^(\d{2})(\d)/g, "($1) $2")
+      .replace(/(\d)(\d{4})$/, "$1-$2")
   }
 
-  // --- CARREGAR CONTATOS ---
   useEffect(() => {
     loadContacts()
   }, [])
+
+  useEffect(() => {
+    setSelectedContactIds((prev) => {
+      const validIds = new Set(contacts.map((c) => c.id))
+      const next = new Set<string>()
+      prev.forEach((id) => {
+        if (validIds.has(id)) next.add(id)
+      })
+      return next
+    })
+  }, [contacts])
 
   async function loadContacts() {
     setIsLoading(true)
@@ -58,25 +77,32 @@ export default function Contacts() {
     }
   }
 
-  // --- FILTROS ---
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch =
       contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (contact.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (contact.company || "").toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesStatus = filterStatus === "all" || contact.status === filterStatus
+
+    const matchesStatus =
+      filterStatus === "all" || contact.status === filterStatus
+
     return matchesSearch && matchesStatus
   })
 
-  // --- AÇÕES ---
+  const visibleSelectedCount = filteredContacts.filter((contact) =>
+    selectedContactIds.has(contact.id),
+  ).length
+  const allVisibleSelected =
+    filteredContacts.length > 0 && visibleSelectedCount === filteredContacts.length
+  const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected
+
   const openModal = (contact?: Contact) => {
     if (contact) {
       setEditingContact(contact)
       setFormData({
         name: contact.name,
         email: contact.email || "",
-        phone: contact.phone || "", // Já virá do banco, assumimos que está ou limpo ou formatado
+        phone: contact.phone || "",
         company: contact.company || "",
         segment: contact.segment || "",
         status: contact.status || "lead",
@@ -84,7 +110,15 @@ export default function Contacts() {
       })
     } else {
       setEditingContact(null)
-      setFormData({ name: "", email: "", phone: "", company: "", segment: "", status: "lead", notes: "" })
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        company: "",
+        segment: "",
+        status: "lead",
+        notes: "",
+      })
     }
     setShowModal(true)
   }
@@ -93,13 +127,13 @@ export default function Contacts() {
     e.preventDefault()
     try {
       if (editingContact) {
-        // Editar
         await updateContact(editingContact.id, formData)
-        setContacts(prev => prev.map(c => c.id === editingContact.id ? { ...c, ...formData } : c))
+        setContacts((prev) =>
+          prev.map((c) => (c.id === editingContact.id ? { ...c, ...formData } : c)),
+        )
       } else {
-        // Criar
         const newContact = await createContact(formData)
-        setContacts(prev => [...prev, newContact])
+        setContacts((prev) => [...prev, newContact])
       }
       setShowModal(false)
     } catch (error) {
@@ -108,15 +142,110 @@ export default function Contacts() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Deseja realmente excluir este contato?")) {
-      try {
-        await deleteContact(id)
-        setContacts(prev => prev.filter(c => c.id !== id))
-      } catch (error) {
-        console.error("Erro ao excluir:", error)
-        alert("Erro ao excluir contato")
+  const handleSelectContact = (
+    contactId: string,
+    index: number,
+    checked: boolean,
+    shiftKey: boolean,
+  ) => {
+    setSelectedContactIds((prev) => {
+      const next = new Set(prev)
+
+      if (shiftKey && lastSelectedIndex !== null) {
+        const start = Math.min(lastSelectedIndex, index)
+        const end = Math.max(lastSelectedIndex, index)
+
+        for (let i = start; i <= end; i++) {
+          const rangeContact = filteredContacts[i]
+          if (!rangeContact) continue
+          if (checked) next.add(rangeContact.id)
+          else next.delete(rangeContact.id)
+        }
+      } else if (checked) {
+        next.add(contactId)
+      } else {
+        next.delete(contactId)
       }
+
+      return next
+    })
+
+    setLastSelectedIndex(index)
+  }
+
+  const handleSelectAllVisible = (checked: boolean) => {
+    setSelectedContactIds((prev) => {
+      const next = new Set(prev)
+      filteredContacts.forEach((contact) => {
+        if (checked) next.add(contact.id)
+        else next.delete(contact.id)
+      })
+      return next
+    })
+  }
+
+  const openDeleteConfirm = (ids: string[]) => {
+    if (ids.length === 0) return
+    setPendingDeleteIds(ids)
+    setShowDeleteConfirmModal(true)
+  }
+
+  const closeDeleteConfirm = () => {
+    if (isDeletingContacts) return
+    setShowDeleteConfirmModal(false)
+    setPendingDeleteIds([])
+  }
+
+  const handleDelete = (id: string) => {
+    openDeleteConfirm([id])
+  }
+
+  const handleDeleteSelected = () => {
+    openDeleteConfirm(Array.from(selectedContactIds))
+  }
+
+  const handleConfirmDelete = async () => {
+    if (pendingDeleteIds.length === 0) return
+
+    setIsDeletingContacts(true)
+    try {
+      const results = await Promise.allSettled(
+        pendingDeleteIds.map((id) => deleteContact(id)),
+      )
+
+      const deletedIds: string[] = []
+      const failedIds: string[] = []
+
+      results.forEach((result, index) => {
+        const id = pendingDeleteIds[index]
+        if (result.status === "fulfilled") deletedIds.push(id)
+        else failedIds.push(id)
+      })
+
+      if (deletedIds.length > 0) {
+        setContacts((prev) => prev.filter((c) => !deletedIds.includes(c.id)))
+        setSelectedContactIds((prev) => {
+          const next = new Set(prev)
+          deletedIds.forEach((id) => next.delete(id))
+          return next
+        })
+      }
+
+      setShowDeleteConfirmModal(false)
+      setPendingDeleteIds([])
+
+      if (failedIds.length > 0) {
+        alert(
+          deletedIds.length > 0
+            ? `Alguns contatos foram excluídos, mas ${failedIds.length} falharam.`
+            : "Erro ao excluir contato(s).",
+        )
+      }
+    } catch (error) {
+      console.error("Erro ao excluir:", error)
+      alert("Erro ao excluir contato(s)")
+    } finally {
+      setIsDeletingContacts(false)
     }
   }
 
@@ -128,7 +257,9 @@ export default function Contacts() {
             <RiContactsBook3Fill className="text-primary text-2xl" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Contatos</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Contatos
+            </h1>
             <p className="text-sm text-muted-foreground">
               Gerencie seus contatos e leads
             </p>
@@ -161,74 +292,161 @@ export default function Contacts() {
             <option value="inactive">Inativo</option>
           </select>
         </div>
+
+        {selectedContactIds.size > 0 && (
+          <div
+            className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-3"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-card)",
+            }}
+          >
+            <p className="text-sm" style={{ color: "var(--color-foreground)" }}>
+              {selectedContactIds.size} contato(s) selecionado(s)
+              {visibleSelectedCount > 0 ? ` (${visibleSelectedCount} visível(is))` : ""}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setSelectedContactIds(new Set())}
+              >
+                Limpar seleção
+              </button>
+              <button
+                className="btn btn-ghost"
+                style={{ color: "var(--color-danger)" }}
+                onClick={handleDeleteSelected}
+              >
+                Excluir selecionados
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card overflow-hidden p-0">
         {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground">Carregando contatos...</div>
+          <div className="p-8 text-center text-muted-foreground">
+            Carregando contatos...
+          </div>
         ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Contato</th>
-              <th>Segmento/Empresa</th>
-              <th>Telefone</th>
-              <th>Data</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredContacts.map((contact) => (
-              <tr key={contact.id}>
-                <td>
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="avatar"
-                      style={{
-                        backgroundColor: "var(--color-accent)",
-                        color: "var(--color-primary-foreground)",
-                      }}
-                    >
-                      {contact.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium">{contact.name}</p>
-                      <p className="text-sm" style={{ color: "var(--color-muted-foreground)" }}>
-                        {contact.email}
-                      </p>
-                    </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={
+                        allVisibleSelected
+                          ? true
+                          : someVisibleSelected
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={(checked) =>
+                        handleSelectAllVisible(checked === true)
+                      }
+                      aria-label="Selecionar contatos visíveis"
+                      className="cursor-pointer border-border bg-card/80 text-primary-foreground data-[state=checked]:bg-primary data-[state=checked]:border-primary hover:border-primary/60"
+                    />
+                    <span>Contato</span>
                   </div>
-                </td>
-                <td>{contact.segment || contact.company || "-"}</td>
-                <td style={{ color: "var(--color-muted-foreground)" }}>{contact.phone}</td>
-                <td style={{ color: "var(--color-muted-foreground)" }}>
-                  {contact.createdAt ? new Date(contact.createdAt).toLocaleDateString("pt-BR") : "-"}
-                </td>
-                <td>
-                  <div className="flex gap-2">
-                    <button
-                      className="btn btn-ghost"
-                      style={{ padding: "6px 10px" }}
-                      onClick={() => openModal(contact)}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      className="btn btn-ghost"
-                      style={{ padding: "6px 10px", color: "var(--color-danger)" }}
-                      onClick={() => handleDelete(contact.id)}
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </td>
+                </th>
+                <th>Segmento/Empresa</th>
+                <th>Telefone</th>
+                <th>Data</th>
+                <th>Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredContacts.map((contact, index) => (
+                <tr
+                  key={contact.id}
+                  style={
+                    selectedContactIds.has(contact.id)
+                      ? { backgroundColor: "rgba(59, 130, 246, 0.08)" }
+                      : undefined
+                  }
+                >
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={selectedContactIds.has(contact.id)}
+                        onClick={(e) => {
+                          shiftSelectionRef.current = Boolean(e.shiftKey)
+                        }}
+                        onCheckedChange={(checked) =>
+                          handleSelectContact(
+                            contact.id,
+                            index,
+                            checked === true,
+                            shiftSelectionRef.current,
+                          )
+                        }
+                        aria-label={`Selecionar ${contact.name}`}
+                        className="cursor-pointer border-border bg-card/80 text-primary-foreground data-[state=checked]:bg-primary data-[state=checked]:border-primary hover:border-primary/60"
+                      />
+                      <div
+                        className="avatar"
+                        style={{
+                          backgroundColor: "var(--color-accent)",
+                          color: "var(--color-primary-foreground)",
+                        }}
+                      >
+                        {contact.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium">{contact.name}</p>
+                        <p
+                          className="text-sm"
+                          style={{ color: "var(--color-muted-foreground)" }}
+                        >
+                          {contact.email}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{contact.segment || contact.company || "-"}</td>
+                  <td style={{ color: "var(--color-muted-foreground)" }}>
+                    {contact.phone}
+                  </td>
+                  <td style={{ color: "var(--color-muted-foreground)" }}>
+                    {contact.createdAt
+                      ? new Date(contact.createdAt).toLocaleDateString("pt-BR")
+                      : "-"}
+                  </td>
+                  <td>
+                    <div className="flex gap-2">
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: "6px 10px" }}
+                        onClick={() => openModal(contact)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        style={{
+                          padding: "6px 10px",
+                          color: "var(--color-danger)",
+                        }}
+                        onClick={() => handleDelete(contact.id)}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
+
         {!isLoading && filteredContacts.length === 0 && (
-          <div className="text-center py-12" style={{ color: "var(--color-muted-foreground)" }}>
+          <div
+            className="text-center py-12"
+            style={{ color: "var(--color-muted-foreground)" }}
+          >
             Nenhum contato encontrado
           </div>
         )}
@@ -237,7 +455,9 @@ export default function Contacts() {
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold mb-6">{editingContact ? "Editar Contato" : "Novo Contato"}</h2>
+            <h2 className="text-xl font-bold mb-6">
+              {editingContact ? "Editar Contato" : "Novo Contato"}
+            </h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Nome</label>
@@ -259,32 +479,38 @@ export default function Contacts() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Telefone / Celular</label>
-                    <input
-                      type="tel"
-                      className="input"
-                      value={formData.phone}
-                      maxLength={15} // Limita o tamanho: (11) 99999-9999
-                      onChange={(e) => {
-                        const formatted = formatPhoneNumber(e.target.value)
-                        setFormData({ ...formData, phone: formatted })
-                      }}
-                      placeholder="(99) 99999-9999"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Segmento</label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={formData.segment}
-                      onChange={(e) => setFormData({ ...formData, segment: e.target.value })}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Telefone / Celular
+                  </label>
+                  <input
+                    type="tel"
+                    className="input"
+                    value={formData.phone}
+                    maxLength={15}
+                    onChange={(e) => {
+                      const formatted = formatPhoneNumber(e.target.value)
+                      setFormData({ ...formData, phone: formatted })
+                    }}
+                    placeholder="(99) 99999-9999"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Segmento</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={formData.segment}
+                    onChange={(e) => setFormData({ ...formData, segment: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="flex gap-3 mt-4">
-                <button type="button" className="btn btn-secondary flex-1" onClick={() => setShowModal(false)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary flex-1"
+                  onClick={() => setShowModal(false)}
+                >
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary flex-1">
@@ -292,6 +518,49 @@ export default function Contacts() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirmModal && (
+        <div className="modal-overlay" onClick={closeDeleteConfirm}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold mb-4">
+              {pendingDeleteIds.length > 1
+                ? "Excluir contatos selecionados?"
+                : "Excluir contato?"}
+            </h2>
+            <p
+              className="mb-6 text-sm"
+              style={{ color: "var(--color-muted-foreground)" }}
+            >
+              {pendingDeleteIds.length > 1
+                ? `Você está prestes a excluir ${pendingDeleteIds.length} contatos de uma vez. Esta ação não pode ser desfeita.`
+                : "Você está prestes a excluir este contato. Esta ação não pode ser desfeita."}
+            </p>
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                className="btn btn-secondary flex-1"
+                onClick={closeDeleteConfirm}
+                disabled={isDeletingContacts}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn flex-1"
+                style={{
+                  backgroundColor: "var(--color-danger)",
+                  color: "white",
+                  opacity: isDeletingContacts ? 0.7 : 1,
+                }}
+                onClick={handleConfirmDelete}
+                disabled={isDeletingContacts}
+              >
+                {isDeletingContacts ? "Excluindo..." : "Confirmar exclusão"}
+              </button>
+            </div>
           </div>
         </div>
       )}
