@@ -182,10 +182,10 @@ export default function DetailsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-card w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-border animate-in zoom-in-95 duration-200 overflow-hidden">
+      <div className="bg-card w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-border animate-in zoom-in-95 duration-200 overflow-hidden">
         {/* HEADER */}
         <header className="flex-none p-6 border-b border-border bg-card">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 pb-4">
             <div className="flex items-center gap-4 w-full">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 <FaDollarSign size={24} />
@@ -324,7 +324,7 @@ export default function DetailsModal({
                       setFormData({ ...formData, ownerId: value })
                     }
                   >
-                    <SelectTrigger className="w-full rounded-xl bg-muted/30 pl-10 h-[42px]">
+                    <SelectTrigger className="w-full rounded-xl bg-muted/30 py-2 pl-10 h-[42px]">
                       <SelectValue placeholder="Selecione um responsável..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -559,7 +559,7 @@ export default function DetailsModal({
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-8 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
           >
             {isSaving ? 'Salvando...' : 'Salvar Alterações'}
           </button>

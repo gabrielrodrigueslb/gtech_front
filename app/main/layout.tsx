@@ -23,13 +23,13 @@ export default function MainLayout({
     >
 
       {/* CONTEÃšDO ABAIXO DO HEADER */}
-      <main className="flex flex-1  min-h-0">
+      <main className="flex flex-1 min-h-0 min-w-0">
         <FunnelProvider>
           {/* SIDEBAR */}
           <Sidebar />
 
           {/* ÃREA DAS PÃGINAS */}
-          <div className="flex-1 overflow-auto min-h-0 p-4 section-content">
+          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 section-content">
             <CRMProvider>{children}</CRMProvider>
           </div>
         </FunnelProvider>
