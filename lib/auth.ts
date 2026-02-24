@@ -12,6 +12,19 @@ interface loginRequestParams {
   password: string;
 }
 
+let meRequestPromise: Promise<any | null> | null = null;
+let meCacheValue: any | null = null;
+let meCacheAt = 0;
+let hasMeCache = false;
+const GET_ME_CACHE_TTL_MS = 15_000;
+
+function resetMeCache() {
+  meRequestPromise = null;
+  meCacheValue = null;
+  meCacheAt = 0;
+  hasMeCache = false;
+}
+
 export async function loginRequest({
   email,
   password,
@@ -30,21 +43,44 @@ export async function loginRequest({
     throw new Error(err.error || 'Erro ao logar');
   }
 
-  return res.json();
+  const data = await res.json();
+  resetMeCache();
+  return data;
 }
 
 export async function getMe() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
-    credentials: 'include',
-    headers: {
-      'x-api-key': `${process.env.NEXT_PUBLIC_API_KEY}`,
-
-    },
-  });
-
-  if (!res.ok) {
-    return null;
+  const now = Date.now();
+  if (hasMeCache && now - meCacheAt < GET_ME_CACHE_TTL_MS) {
+    return meCacheValue;
   }
 
-  return res.json();
+  if (meRequestPromise) {
+    return meRequestPromise;
+  }
+
+  meRequestPromise = (async () => {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+      credentials: 'include',
+      headers: {
+        'x-api-key': `${process.env.NEXT_PUBLIC_API_KEY}`,
+      },
+    });
+
+    if (!res.ok) {
+      meCacheValue = null;
+      meCacheAt = Date.now();
+      hasMeCache = true;
+      return null;
+    }
+
+    const data = await res.json();
+    meCacheValue = data;
+    meCacheAt = Date.now();
+    hasMeCache = true;
+    return data;
+  })().finally(() => {
+    meRequestPromise = null;
+  });
+
+  return meRequestPromise;
 }

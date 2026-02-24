@@ -7,7 +7,7 @@ import { MdLeaderboard } from 'react-icons/md';
 import { TiContacts } from 'react-icons/ti';
 import { LuLayoutDashboard } from "react-icons/lu";
 import { FaBuildingUser } from "react-icons/fa6";
-import { FaTasks , FaRegNewspaper} from "react-icons/fa";
+import { FaTasks , FaRegNewspaper, FaWhatsapp } from "react-icons/fa";
 import Link from 'next/link';
 
 export default function Sidebar() {
@@ -20,6 +20,7 @@ export default function Sidebar() {
     { id:1, path: '/main/dashboard', label: 'Dashboard', icon: <LuLayoutDashboard /> },
     { id:2, path: '/main/contacts', label: 'Contatos', icon: <TiContacts /> },
     { id:3, path: '/main/crm', label: 'Negócios', icon: <MdLeaderboard /> },
+    { id:8, path: '/main/chat', label: 'Chat', icon: <FaWhatsapp /> },
     { id:4, path: '/main/clientes', label: 'Clientes', icon: <FaBuildingUser /> },
     { id:7, path: '/main/posts', label: 'Posts', icon: <FaRegNewspaper /> },
     { id:5, path: '/main/tasks', label: 'Tarefas', icon: <FaTasks /> },

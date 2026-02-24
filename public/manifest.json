@@ -4,7 +4,7 @@
   "description": "Sistema de CRM interno da Lintra Tech",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "linear-gradient(121.09deg, #11182b 0%, #280f0f 100%)",
+  "background_color": "#11182b",
   "theme_color": "#3b82f6",
   "orientation": "portrait",
   "icons": [
