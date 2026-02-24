@@ -769,7 +769,7 @@ function ChatPageContent() {
       const text = composerText;
       setComposerText('');
       await sendWhatsAppTextMessage(selectedConversationId, text);
-      // O socket jÃ¡ injeta a mensagem/status. Evita recarregar a conversa com loader (piscada).
+      // O socket já injeta a mensagem/status. Evita recarregar a conversa com loader (piscada).
       if (!socketConnectedRef.current) {
         await loadConversationMessages(selectedConversationId, false);
       }
@@ -1028,8 +1028,8 @@ function ChatPageContent() {
                                 }`}
                                 title={
                                   conversation.assignedUserId
-                                    ? 'Com responsÃ¡vel'
-                                    : 'Sem responsÃ¡vel'
+                                    ? 'Com responsável'
+                                    : 'Sem responsável'
                                 }
                               />
                             </div>
@@ -1084,7 +1084,7 @@ function ChatPageContent() {
                                   </span>
                                 ) : (
                                   <span className="px-2 py-0.5 text-[10px] rounded-full border border-border text-muted-foreground whitespace-nowrap">
-                                    Sem responsÃ¡vel
+                                    Sem responsável
                                   </span>
                                 )}
                               </div>
@@ -1100,7 +1100,7 @@ function ChatPageContent() {
           </div>
         </section>
 
-        {/* COLUNA 2: ÃREA DO CHAT */}
+        {/* COLUNA 2: ÁREA DO CHAT */}
         <section
           className={`flex-1 flex-col min-h-0 overflow-hidden bg-card md:rounded-2xl md:border md:border-border md:overflow-hidden md:shadow-sm 
           ${!selectedConversationId ? 'hidden md:flex' : 'flex'}`}
@@ -1304,13 +1304,13 @@ function ChatPageContent() {
                 {activeConversation.assignedUserId !== user?.id &&
                   activeConversation.assignedUserId && (
                     <div className="mb-3 p-2 bg-yellow-50 text-yellow-800 text-xs rounded-md border border-yellow-200 text-center">
-                      Esta conversa estÃ¡ atribuÃ­da a outro usuÃ¡rio.
+                      Esta conversa está atribuÃ­da a outro usuário.
                     </div>
                   )}
                 {!activeConversation.assignedUserId && (
                   <div className="mb-3 flex justify-between items-center p-2 bg-primary/5 border border-primary/20 rounded-lg">
                     <span className="text-xs text-foreground font-medium">
-                      Conversa sem responsÃ¡vel
+                      Conversa sem responsável
                     </span>
                     <button
                       className="btn btn-secondary text-xs px-3 py-1.5 h-auto"
@@ -1414,15 +1414,16 @@ function ChatPageContent() {
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {status?.status && status.status !== 'disconnected' ? (
-                    <button
-                      className="btn border border-red-200 text-red-600 hover:bg-red-50"
-                      onClick={() => handleDisconnect(true)}
-                      disabled={isConnecting}
-                    >
-                      Desconectar número
-                    </button>
-                  ) : null}
+                  <button
+                    className="btn border border-red-200 text-red-600 hover:bg-red-50"
+                    onClick={() => handleDisconnect(true)}
+                    disabled={isConnecting}
+                    title="Remove a sessão local e força novo QR Code"
+                  >
+                    {status?.status && status.status !== 'disconnected'
+                      ? 'Desconectar número'
+                      : 'Limpar sessão antiga'}
+                  </button>
                   {status?.status !== 'connected' && (
                     <button
                       className="btn btn-primary"
@@ -1455,7 +1456,7 @@ function ChatPageContent() {
                   </div>
                   <div className="rounded-lg bg-muted/30 border border-border p-3">
                     <p className="text-xs text-muted-foreground mb-1">
-                      Sem responsÃ¡vel
+                      Sem responsável
                     </p>
                     <p className="font-bold text-lg">{queueStats.unassigned}</p>
                   </div>
@@ -1471,11 +1472,11 @@ function ChatPageContent() {
 
                 <div className="mt-4">
                   <p className="text-xs text-muted-foreground mb-2">
-                    UsuÃ¡rios online no chat
+                    Usuários online no chat
                   </p>
                   {presence.onlineUsers.length === 0 ? (
                     <p className="text-sm text-muted-foreground italic">
-                      Nenhum usuÃ¡rio online no momento.
+                      Nenhum usuário online no momento.
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
@@ -1597,7 +1598,7 @@ function ChatPageContent() {
           <DialogHeader>
             <DialogTitle>Transferir atendimento</DialogTitle>
             <DialogDescription>
-              Selecione um usuÃ¡rio online para assumir esta conversa.
+              Selecione um usuário online para assumir esta conversa.
             </DialogDescription>
           </DialogHeader>
 
@@ -1611,7 +1612,7 @@ function ChatPageContent() {
                   {renderConversationTitle(activeConversation)}
                 </p>
                 <p className="text-xs mt-1 text-muted-foreground">
-                  ResponsÃ¡vel:{' '}
+                  Responsável:{' '}
                   <span className="font-medium text-foreground">
                     {activeConversation.assignedUser?.name || 'Nenhum'}
                   </span>
@@ -1652,7 +1653,7 @@ function ChatPageContent() {
               </div>
             ) : (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 text-center">
-                Nenhum outro usuÃ¡rio estÃ¡ online no chat no momento.
+                Nenhum outro usuário está online no chat no momento.
               </div>
             )}
           </div>
@@ -1687,9 +1688,9 @@ function ChatPageContent() {
               Encerrar atendimento
             </DialogTitle>
             <DialogDescription>
-              A conversa sairÃ¡ da sua lista ativa. Se o cliente enviar uma nova
-              mensagem, ela voltarÃ¡ automaticamente para o inbox sem
-              responsÃ¡vel.
+              A conversa sairá da sua lista ativa. Se o cliente enviar uma nova
+              mensagem, ela voltará automaticamente para o inbox sem
+              responsável.
             </DialogDescription>
           </DialogHeader>
 
@@ -1737,7 +1738,7 @@ function ChatPageContent() {
             <DialogTitle>Iniciar Novo Atendimento</DialogTitle>
             <DialogDescription>
               Abra uma conversa ativa com um cliente informando o número. Você
-              pode opcionalmente jÃ¡ enviar a primeira mensagem.
+              pode opcionalmente já enviar a primeira mensagem.
             </DialogDescription>
           </DialogHeader>
 
@@ -1753,8 +1754,8 @@ function ChatPageContent() {
                 onChange={(e) => setNewConversationPhone(e.target.value)}
               />
               <p className="text-xs mt-1.5 text-muted-foreground">
-                ObrigatÃ³rio incluir DDI (Ex: Brasil = 55) + DDD + Número.
-                Apenas números.
+                ObrigatÓrio incluir DDI (Ex: Brasil = 55) + DDD + Número. Apenas
+                números.
               </p>
             </div>
 
@@ -1776,7 +1777,7 @@ function ChatPageContent() {
               </label>
               <textarea
                 className="input w-full min-h-[120px] resize-none bg-background rounded-xl border-border"
-                placeholder="OlÃ¡, como podemos ajudar?"
+                placeholder="Olá, como podemos ajudar?"
                 value={newConversationInitialMessage}
                 onChange={(e) =>
                   setNewConversationInitialMessage(e.target.value)

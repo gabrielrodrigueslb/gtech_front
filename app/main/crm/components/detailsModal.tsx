@@ -267,7 +267,7 @@ export default function DetailsModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-left-2 duration-300">
                 <Field label="Valor Estimado" icon={FaDollarSign}>
                   <input
-                    type="text" 
+                    type="text"
                     className={inputClass}
                     value={formatCurrency(formData.value)}
                     onChange={(e) =>
@@ -362,7 +362,7 @@ export default function DetailsModal({
                       type="text"
                       className={inputClass}
                       value={formData.clientName}
-                      placeholder='Nome'
+                      placeholder="Nome"
                       onChange={(e) =>
                         setFormData({ ...formData, clientName: e.target.value })
                       }
@@ -374,7 +374,7 @@ export default function DetailsModal({
                       type="text"
                       className={inputClass}
                       value={formData.clientRole}
-                      placeholder='Dono'
+                      placeholder="Dono"
                       onChange={(e) =>
                         setFormData({ ...formData, clientRole: e.target.value })
                       }
@@ -403,7 +403,7 @@ export default function DetailsModal({
                       type="email"
                       className={inputClass}
                       value={formData.clientEmail}
-                      placeholder='exemplo@email.com'
+                      placeholder="exemplo@email.com"
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -422,7 +422,7 @@ export default function DetailsModal({
                       type="text"
                       className={inputClass}
                       value={formData.enderecoCliente}
-                      placeholder='Rua exemplo'
+                      placeholder="Rua exemplo"
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -434,7 +434,7 @@ export default function DetailsModal({
                 </div>
 
                 <div className="border-t border-border/50 my-4" />
-                
+
                 <div className="bg-primary/5 border border-primary/10 rounded-xl p-4">
                   <Field label="Vincular Contato do CRM" icon={FaHashtag}>
                     <Select

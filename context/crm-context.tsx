@@ -84,7 +84,6 @@ interface CRMContextType {
   deleteDeal: (id: string) => void;
   moveDeal: (id: string, stageId: string) => void;
 
-
   addTask: (task: Partial<Task> & { title: string }) => void;
   updateTask: (id: string, task: Partial<Task>) => void;
   deleteTask: (id: string) => void;
@@ -184,14 +183,10 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   };
 
   const moveDeal = (id: string, stageId: string) => {
-  setDeals((prev) =>
-    prev.map((d) =>
-      d.id === id
-        ? { ...d, stage: stageId }
-        : d
-    ),
-  );
-};
+    setDeals((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, stage: stageId } : d)),
+    );
+  };
 
   const addTask = (taskData: Partial<Task> & { title: string }) => {
     const newTask = {
@@ -224,7 +219,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       stages: funnelData.stages || [],
     } as Funnel;
 
-    // A MUDANÇA ESTÁ AQUI: Verificamos dentro do callback 'prev'
+    // A MUDANÇA ESTÚ AQUI: Verificamos dentro do callback 'prev'
     setFunnels((prev) => {
       // Se já existir um funil com esse ID na lista, retornamos a lista sem alterações
       if (prev.some((f) => f.id === newFunnel.id)) {

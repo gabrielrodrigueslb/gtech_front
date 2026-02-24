@@ -23,14 +23,13 @@ export default function MainLayout({
       className="h-screen flex-col-reverse md:flex-row flex w-screen overflow-hidden animate-in transition-opacity
         duration-300 ease-in-out"
     >
-
-      {/* CONTEÃšDO ABAIXO DO HEADER */}
+      {/* CONTEÚDO ABAIXO DO HEADER */}
       <main className="flex flex-1 min-h-0 min-w-0">
         <FunnelProvider>
           {/* SIDEBAR */}
           <Sidebar />
 
-          {/* ÃREA DAS PÃGINAS */}
+          {/* ÁREA DAS PÁGINAS */}
           <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 section-content">
             <WhatsAppSocketProvider>
               <CRMProvider>
