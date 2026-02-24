@@ -55,8 +55,8 @@ export async function connectWhatsApp() {
   return data
 }
 
-export async function disconnectWhatsApp() {
-  const { data } = await api.post<WhatsAppStatus>('/whatsapp/disconnect')
+export async function disconnectWhatsApp(params?: { resetSession?: boolean }) {
+  const { data } = await api.post<WhatsAppStatus>('/whatsapp/disconnect', params || {})
   return data
 }
 

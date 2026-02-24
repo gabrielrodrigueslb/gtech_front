@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FaCog, FaQrcode, FaSyncAlt, FaWhatsapp } from 'react-icons/fa';
-import { io, type Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 
 import {
   Dialog,
@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { getMe } from '@/lib/auth';
+import { useWhatsAppSocket } from '@/context/whatsapp-socket-context';
 import {
   readWhatsAppAlertPreferences,
   writeWhatsAppAlertPreferences,
@@ -50,13 +50,6 @@ import {
   User,
 } from 'lucide-react';
 
-type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role?: string;
-};
-
 type WhatsAppSocketMessageEvent = {
   conversationId: string;
   message: WhatsAppMessage;
@@ -72,11 +65,6 @@ type WhatsAppPresencePayload = {
   }>;
   onlineCount: number;
 };
-
-function getSocketBaseUrl() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-  return apiUrl.replace(/\/api\/?$/, '');
-}
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -280,7 +268,7 @@ function formatConversationListTime(value?: string | null) {
 
 function ChatPageContent() {
   const searchParams = useSearchParams();
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const { user, socket: sharedSocket } = useWhatsAppSocket();
   const [status, setStatus] = useState<WhatsAppStatus | null>(null);
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -294,6 +282,7 @@ function ChatPageContent() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [presence, setPresence] = useState<WhatsAppPresencePayload>({
     onlineUsers: [],
@@ -322,6 +311,9 @@ function ChatPageContent() {
   const shouldAutoScrollRef = useRef(true);
   const socketRef = useRef<Socket | null>(null);
   const socketConnectedRef = useRef(false);
+  const statusRequestInFlightRef = useRef(false);
+  const conversationsRequestInFlightRef = useRef(false);
+  const searchRefreshTimeoutRef = useRef<number | null>(null);
   const selectedConversationIdRef = useRef<string | null>(null);
   const searchRef = useRef('');
   const requestedConversationIdRef = useRef<string | null>(null);
@@ -394,32 +386,38 @@ function ChatPageContent() {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const me = await getMe();
-        if (!mounted) return;
-        setUser(me);
-      } catch {}
-    })();
-    return () => { mounted = false; };
+    void loadStatus(true);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadStatus(true);
+        if (!socketConnectedRef.current) void loadConversations();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
-    loadStatus();
-    const interval = window.setInterval(loadStatus, 15000);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    loadConversations();
-    const interval = window.setInterval(() => {
-      // Evita "piscada" quando o socket já está atualizando em tempo real.
-      if (socketConnectedRef.current) return;
-      void loadConversations();
-    }, 12000);
-    return () => window.clearInterval(interval);
+    void loadConversations(true);
   }, [scope, search]);
+
+  useEffect(() => {
+    if (isRealtimeConnected) return;
+
+    const interval = window.setInterval(() => {
+      void loadStatus();
+      void loadConversations();
+      if (selectedConversationIdRef.current) {
+        void loadConversationMessages(selectedConversationIdRef.current, false);
+      }
+    }, 45000);
+
+    return () => window.clearInterval(interval);
+  }, [isRealtimeConnected, scope, search]);
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -432,26 +430,34 @@ function ChatPageContent() {
   }, [selectedConversationId]);
 
   useEffect(() => {
-    if (!user) return;
-    const socket = io(getSocketBaseUrl(), {
-      withCredentials: true,
-      transports: ['websocket'],
-      autoConnect: true,
-    });
+    const socket = sharedSocket;
+    if (!user || !socket) return;
     socketRef.current = socket;
+    socketConnectedRef.current = socket.connected;
+    setIsRealtimeConnected(socket.connected);
 
-    socket.on('connect', () => {
+    const handleSocketConnect = () => {
       socketConnectedRef.current = true;
-      if (selectedConversationId) socket.emit('whatsapp:joinConversation', selectedConversationId);
-    });
-    socket.on('disconnect', () => {
-      socketConnectedRef.current = false;
-    });
+      setIsRealtimeConnected(true);
+      void loadStatus(true);
+      void loadConversations(true);
+      if (selectedConversationIdRef.current) {
+        void loadConversationMessages(selectedConversationIdRef.current, false);
+        socket.emit('whatsapp:joinConversation', selectedConversationIdRef.current);
+      }
+    };
 
-    socket.on('whatsapp:status.updated', (payload: WhatsAppStatus) => { setStatus(payload); });
-    socket.on('whatsapp:presence.updated', (payload: WhatsAppPresencePayload) => { setPresence(payload); });
-    
-    socket.on('whatsapp:conversation.updated', (payload: WhatsAppConversation) => {
+    const handleSocketDisconnect = () => {
+      socketConnectedRef.current = false;
+      setIsRealtimeConnected(false);
+      void loadStatus(true);
+      void loadConversations();
+    };
+
+    const handleStatusUpdated = (payload: WhatsAppStatus) => { setStatus(payload); };
+    const handlePresenceUpdated = (payload: WhatsAppPresencePayload) => { setPresence(payload); };
+
+    const handleConversationUpdated = (payload: WhatsAppConversation) => {
       setConversations((prev) => {
         const exists = prev.some((c) => c.id === payload.id);
         const next = exists ? prev.map((c) => (c.id === payload.id ? { ...c, ...payload } : c)) : [payload, ...prev];
@@ -465,10 +471,18 @@ function ChatPageContent() {
       if (selectedConversationIdRef.current === payload.id) {
         setSelectedConversation((prev) => ({ ...(prev || {}), ...payload }) as WhatsAppConversation);
       }
-      if (searchRef.current.trim()) void loadConversations();
-    });
+      if (searchRef.current.trim()) {
+        if (searchRefreshTimeoutRef.current) {
+          window.clearTimeout(searchRefreshTimeoutRef.current);
+        }
+        searchRefreshTimeoutRef.current = window.setTimeout(() => {
+          searchRefreshTimeoutRef.current = null;
+          void loadConversations();
+        }, 500);
+      }
+    };
 
-    socket.on('whatsapp:message.created', (payload: WhatsAppSocketMessageEvent) => {
+    const handleMessageCreated = (payload: WhatsAppSocketMessageEvent) => {
       if (payload.conversation) {
         setConversations((prev) => {
           const exists = prev.some((c) => c.id === payload.conversation!.id);
@@ -499,16 +513,35 @@ function ChatPageContent() {
           void markWhatsAppConversationRead(payload.conversationId).catch(() => {});
         }
       }
-    });
+    };
 
-    socket.on('connect_error', (error) => console.warn('Socket WhatsApp connect_error:', error?.message));
+    const handleConnectError = (error: any) => console.warn('Socket WhatsApp connect_error:', error?.message);
+
+    socket.on('connect', handleSocketConnect);
+    socket.on('disconnect', handleSocketDisconnect);
+    socket.on('whatsapp:status.updated', handleStatusUpdated);
+    socket.on('whatsapp:presence.updated', handlePresenceUpdated);
+    socket.on('whatsapp:conversation.updated', handleConversationUpdated);
+    socket.on('whatsapp:message.created', handleMessageCreated);
+    socket.on('connect_error', handleConnectError);
 
     return () => {
       socketConnectedRef.current = false;
-      socket.disconnect();
+      setIsRealtimeConnected(false);
+      if (searchRefreshTimeoutRef.current) {
+        window.clearTimeout(searchRefreshTimeoutRef.current);
+        searchRefreshTimeoutRef.current = null;
+      }
+      socket.off('connect', handleSocketConnect);
+      socket.off('disconnect', handleSocketDisconnect);
+      socket.off('whatsapp:status.updated', handleStatusUpdated);
+      socket.off('whatsapp:presence.updated', handlePresenceUpdated);
+      socket.off('whatsapp:conversation.updated', handleConversationUpdated);
+      socket.off('whatsapp:message.created', handleMessageCreated);
+      socket.off('connect_error', handleConnectError);
       socketRef.current = null;
     };
-  }, [user]);
+  }, [user, sharedSocket]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -523,16 +556,32 @@ function ChatPageContent() {
     if (shouldAutoScrollRef.current) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  async function loadStatus() {
+  async function loadStatus(force = false) {
+    if (!force) {
+      if (statusRequestInFlightRef.current) return;
+      if (socketConnectedRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    }
+
+    statusRequestInFlightRef.current = true;
     try {
       if (!status) setIsLoadingStatus(true);
       const data = await getWhatsAppStatus();
       setStatus(data);
     } catch (error: any) { setErrorMessage(error?.response?.data?.error || 'Erro ao consultar status'); }
-    finally { setIsLoadingStatus(false); }
+    finally {
+      statusRequestInFlightRef.current = false;
+      setIsLoadingStatus(false);
+    }
   }
 
-  async function loadConversations() {
+  async function loadConversations(force = false) {
+    if (!force) {
+      if (conversationsRequestInFlightRef.current) return;
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    }
+
+    conversationsRequestInFlightRef.current = true;
     try {
       if (conversations.length === 0) setIsLoadingConversations(true);
       const data = await getWhatsAppConversations({ scope, search: search.trim() || undefined, limit: 80 });
@@ -546,7 +595,10 @@ function ChatPageContent() {
         setSelectedConversationId(data[0].id);
       }
     } catch (error: any) { setErrorMessage(error?.response?.data?.error || 'Erro ao carregar conversas'); }
-    finally { setIsLoadingConversations(false); }
+    finally {
+      conversationsRequestInFlightRef.current = false;
+      setIsLoadingConversations(false);
+    }
   }
 
   async function loadConversationMessages(conversationId: string, forceScroll: boolean) {
@@ -569,10 +621,10 @@ function ChatPageContent() {
     finally { setIsConnecting(false); }
   }
 
-  async function handleDisconnect() {
+  async function handleDisconnect(resetSession = false) {
     try {
       setIsConnecting(true); setErrorMessage(null);
-      const data = await disconnectWhatsApp();
+      const data = await disconnectWhatsApp(resetSession ? { resetSession: true } : undefined);
       setStatus(data);
     } catch (error: any) { setErrorMessage(error?.response?.data?.error || 'Erro ao desconectar WhatsApp'); }
     finally { setIsConnecting(false); }
@@ -585,7 +637,7 @@ function ChatPageContent() {
       const text = composerText;
       setComposerText('');
       await sendWhatsAppTextMessage(selectedConversationId, text);
-      // O socket já injeta a mensagem/status. Evita recarregar a conversa com loader (piscada).
+      // O socket jÃ¡ injeta a mensagem/status. Evita recarregar a conversa com loader (piscada).
       if (!socketConnectedRef.current) {
         await loadConversationMessages(selectedConversationId, false);
       }
@@ -686,6 +738,16 @@ function ChatPageContent() {
               {status.phoneNumber}
             </div>
           )}
+          {status?.status && status.status !== 'disconnected' && (
+            <button
+              className="btn border border-red-200 text-red-600 hover:bg-red-50"
+              onClick={() => handleDisconnect(true)}
+              disabled={isConnecting}
+              title="Desconecta o nÃºmero atual e limpa a sessÃ£o para gerar novo QR"
+            >
+              Desconectar nÃºmero
+            </button>
+          )}
           <button
             className="btn btn-primary"
             onClick={() => setIsNewConversationModalOpen(true)}
@@ -774,7 +836,7 @@ function ChatPageContent() {
                                 className={`absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-card ${
                                   conversation.assignedUserId ? 'bg-emerald-500' : 'bg-muted-foreground/40'
                                 }`}
-                                title={conversation.assignedUserId ? 'Com responsável' : 'Sem responsável'}
+                                title={conversation.assignedUserId ? 'Com responsÃ¡vel' : 'Sem responsÃ¡vel'}
                               />
                             </div>
 
@@ -813,7 +875,7 @@ function ChatPageContent() {
                                   </span>
                                 ) : (
                                   <span className="px-2 py-0.5 text-[10px] rounded-full border border-border text-muted-foreground whitespace-nowrap">
-                                    Sem responsável
+                                    Sem responsÃ¡vel
                                   </span>
                                 )}
                               </div>
@@ -829,7 +891,7 @@ function ChatPageContent() {
           </div>
         </section>
 
-        {/* COLUNA 2: ÁREA DO CHAT */}
+        {/* COLUNA 2: ÃREA DO CHAT */}
         <section 
           className={`flex-1 flex-col min-h-0 overflow-hidden bg-card md:rounded-2xl md:border md:border-border md:overflow-hidden md:shadow-sm 
           ${!selectedConversationId ? 'hidden md:flex' : 'flex'}`}
@@ -838,7 +900,7 @@ function ChatPageContent() {
              <div className="m-auto text-center max-w-sm p-6">
                 <FaQrcode className="mx-auto text-muted-foreground text-4xl mb-4" />
                 <h3 className="text-lg font-semibold">Conecte seu WhatsApp</h3>
-                <p className="text-sm text-muted-foreground mt-2 mb-6">Acesse as configurações para parear seu número e começar a atender.</p>
+                <p className="text-sm text-muted-foreground mt-2 mb-6">Acesse as configuraÃ§Ãµes para parear seu nÃºmero e comeÃ§ar a atender.</p>
                 <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting}>
                   {isConnecting ? 'Conectando...' : 'Gerar QR Code'}
                 </button>
@@ -850,7 +912,7 @@ function ChatPageContent() {
               {/* HEADER DO CHAT */}
               <div className="p-3 sm:p-4 border-b border-border flex flex-row items-center justify-between gap-3 bg-card/80 backdrop-blur-md z-10">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                  {/* Botão de Voltar para Mobile */}
+                  {/* BotÃ£o de Voltar para Mobile */}
                   <button
                     className="md:hidden p-2 -ml-2 text-muted-foreground hover:bg-muted rounded-full transition-colors cursor-pointer"
                     onClick={() => setSelectedConversationId(null)}
@@ -943,7 +1005,7 @@ function ChatPageContent() {
                             </p>
                           )}
                           <p className="whitespace-pre-wrap wrap-break-word text-[14px] sm:text-[15px] leading-relaxed">
-                            {displayBody || '(mídia/mensagem não suportada)'}
+                            {displayBody || '(mÃ­dia/mensagem nÃ£o suportada)'}
                           </p>
                           <div
                             className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
@@ -973,12 +1035,12 @@ function ChatPageContent() {
               <div className="p-3 sm:p-4 bg-card border-t border-border">
                 {activeConversation.assignedUserId !== user?.id && activeConversation.assignedUserId && (
                    <div className="mb-3 p-2 bg-yellow-50 text-yellow-800 text-xs rounded-md border border-yellow-200 text-center">
-                     Esta conversa está atribuída a outro usuário.
+                     Esta conversa estÃ¡ atribuÃ­da a outro usuÃ¡rio.
                    </div>
                 )}
                 {!activeConversation.assignedUserId && (
                   <div className="mb-3 flex justify-between items-center p-2 bg-primary/5 border border-primary/20 rounded-lg">
-                    <span className="text-xs text-foreground font-medium">Conversa sem responsável</span>
+                    <span className="text-xs text-foreground font-medium">Conversa sem responsÃ¡vel</span>
                     <button className="btn btn-secondary text-xs px-3 py-1.5 h-auto" onClick={handleAssignToMe}>
                       Assumir
                     </button>
@@ -1023,7 +1085,7 @@ function ChatPageContent() {
                   </div>
                   <p className="font-semibold text-lg">Selecione uma conversa</p>
                   <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
-                    As mensagens recebidas irão aparecer na lista ao lado.
+                    As mensagens recebidas irÃ£o aparecer na lista ao lado.
                   </p>
                 </div>
               </div>
@@ -1032,58 +1094,58 @@ function ChatPageContent() {
         </section>
       </div>
 
-      {/* MODAL DE CONFIGURAÇÕES */}
+      {/* MODAL DE CONFIGURAÃ‡Ã•ES */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent className="w-[min(56rem,calc(100vw-1rem))] max-w-none max-h-[90vh] min-h-0 overflow-hidden p-0 gap-0 flex flex-col rounded-2xl">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-border bg-card">
-            <DialogTitle className="text-xl">Configurações do Chat WhatsApp</DialogTitle>
+            <DialogTitle className="text-xl">ConfiguraÃ§Ãµes do Chat WhatsApp</DialogTitle>
             <DialogDescription>
-              Conexão, fila de distribuição e alertas do atendimento.
+              ConexÃ£o, fila de distribuiÃ§Ã£o e alertas do atendimento.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4 bg-muted/10">
             <div className="grid gap-5">
               
-              {/* Conexão */}
+              {/* ConexÃ£o */}
               <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <p className="text-sm font-semibold mb-4 text-primary">Status da Conexão</p>
+                <p className="text-sm font-semibold mb-4 text-primary">Status da ConexÃ£o</p>
                 <div className="grid sm:grid-cols-2 gap-4 text-sm">
                   <div className="rounded-lg bg-muted/30 border border-border p-3">
                     <p className="text-xs text-muted-foreground mb-1">Status</p>
                     <p className="font-medium" style={{ color: statusColor }}>{statusLabel}</p>
                   </div>
                   <div className="rounded-lg bg-muted/30 border border-border p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Número conectado</p>
-                    <p className="font-medium truncate">{status?.phoneNumber || status?.wid || 'Não conectado'}</p>
+                    <p className="text-xs text-muted-foreground mb-1">NÃºmero conectado</p>
+                    <p className="font-medium truncate">{status?.phoneNumber || status?.wid || 'NÃ£o conectado'}</p>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {status?.status === 'connected' ? (
-                    <button className="btn border border-red-200 text-red-600 hover:bg-red-50" onClick={handleDisconnect} disabled={isConnecting}>
-                      Desconectar
+                    <button className="btn border border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleDisconnect(true)} disabled={isConnecting}>
+                      Desconectar nÃºmero
                     </button>
                   ) : (
                     <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting}>
                       {isConnecting ? 'Conectando...' : 'Conectar / Gerar QR'}
                     </button>
                   )}
-                  <button className="btn btn-secondary" onClick={loadStatus}>
+                  <button className="btn btn-secondary" onClick={() => loadStatus(true)}>
                     Atualizar status
                   </button>
                 </div>
               </div>
 
-              {/* Fila e Distribuição */}
+              {/* Fila e DistribuiÃ§Ã£o */}
               <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <p className="text-sm font-semibold mb-4 text-primary">Fila e Distribuição</p>
+                <p className="text-sm font-semibold mb-4 text-primary">Fila e DistribuiÃ§Ã£o</p>
                 <div className="grid sm:grid-cols-3 gap-4 text-sm">
                   <div className="rounded-lg bg-muted/30 border border-border p-3">
                     <p className="text-xs text-muted-foreground mb-1">Atendentes online</p>
                     <p className="font-bold text-lg">{presence.onlineCount}</p>
                   </div>
                   <div className="rounded-lg bg-muted/30 border border-border p-3">
-                    <p className="text-xs text-muted-foreground mb-1">Sem responsável</p>
+                    <p className="text-xs text-muted-foreground mb-1">Sem responsÃ¡vel</p>
                     <p className="font-bold text-lg">{queueStats.unassigned}</p>
                   </div>
                   <div className="rounded-lg bg-muted/30 border border-border p-3">
@@ -1093,9 +1155,9 @@ function ChatPageContent() {
                 </div>
                 
                 <div className="mt-4">
-                  <p className="text-xs text-muted-foreground mb-2">Usuários online no chat</p>
+                  <p className="text-xs text-muted-foreground mb-2">UsuÃ¡rios online no chat</p>
                   {presence.onlineUsers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">Nenhum usuário online no momento.</p>
+                    <p className="text-sm text-muted-foreground italic">Nenhum usuÃ¡rio online no momento.</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {presence.onlineUsers.map((onlineUser) => (
@@ -1106,7 +1168,7 @@ function ChatPageContent() {
                         >
                           <span className="w-1.5 h-1.5 inline-block rounded-full bg-green-500 mr-2"></span>
                           {onlineUser.name}
-                          {onlineUser.id === user?.id ? ' (você)' : ''}
+                          {onlineUser.id === user?.id ? ' (vocÃª)' : ''}
                         </span>
                       ))}
                     </div>
@@ -1116,12 +1178,12 @@ function ChatPageContent() {
 
               {/* Alertas */}
               <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <p className="text-sm font-semibold mb-4 text-primary">Preferências de Alerta</p>
+                <p className="text-sm font-semibold mb-4 text-primary">PreferÃªncias de Alerta</p>
                 <div className="space-y-4">
                   <label className="flex items-center justify-between gap-4 cursor-pointer p-2 hover:bg-muted/30 rounded-lg transition-colors">
                     <div>
                       <p className="text-sm font-medium">Toast interno global</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Notificação visual dentro do sistema ao receber mensagem.</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">NotificaÃ§Ã£o visual dentro do sistema ao receber mensagem.</p>
                     </div>
                     <Switch
                       checked={alertPreferences.inAppToastEnabled}
@@ -1142,8 +1204,8 @@ function ChatPageContent() {
 
                   <label className="flex items-center justify-between gap-4 cursor-pointer p-2 hover:bg-muted/30 rounded-lg transition-colors">
                     <div>
-                      <p className="text-sm font-medium">Notificação do navegador (Push)</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Alertas do sistema operacional mesmo se a aba não estiver visível.</p>
+                      <p className="text-sm font-medium">NotificaÃ§Ã£o do navegador (Push)</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Alertas do sistema operacional mesmo se a aba nÃ£o estiver visÃ­vel.</p>
                     </div>
                     <Switch
                       checked={alertPreferences.browserNotificationEnabled}
@@ -1153,7 +1215,7 @@ function ChatPageContent() {
 
                   {notificationPermission !== 'granted' && alertPreferences.browserNotificationEnabled && (
                     <div className="mt-2 ml-2 flex items-center gap-3 bg-amber-50 p-3 rounded-lg border border-amber-200">
-                      <span className="text-xs text-amber-800">Status permissão: <strong>{notificationPermission}</strong></span>
+                      <span className="text-xs text-amber-800">Status permissÃ£o: <strong>{notificationPermission}</strong></span>
                       {notificationPermission !== 'unsupported' && (
                         <button className="text-xs bg-amber-600 text-white px-3 py-1.5 rounded-md hover:bg-amber-700 transition-colors" onClick={requestNotificationPermission}>
                           Permitir no navegador
@@ -1169,19 +1231,19 @@ function ChatPageContent() {
 
           <DialogFooter className="px-6 py-4 border-t border-border bg-card">
             <button className="btn btn-primary" onClick={() => setIsSettingsOpen(false)}>
-              Fechar Configurações
+              Fechar ConfiguraÃ§Ãµes
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DE TRANSFERÊNCIA */}
+      {/* MODAL DE TRANSFERÃŠNCIA */}
       <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Transferir atendimento</DialogTitle>
             <DialogDescription>
-              Selecione um usuário online para assumir esta conversa.
+              Selecione um usuÃ¡rio online para assumir esta conversa.
             </DialogDescription>
           </DialogHeader>
 
@@ -1191,14 +1253,14 @@ function ChatPageContent() {
                 <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Conversa atual</p>
                 <p className="font-medium truncate text-foreground">{renderConversationTitle(activeConversation)}</p>
                 <p className="text-xs mt-1 text-muted-foreground">
-                  Responsável: <span className="font-medium text-foreground">{activeConversation.assignedUser?.name || 'Nenhum'}</span>
+                  ResponsÃ¡vel: <span className="font-medium text-foreground">{activeConversation.assignedUser?.name || 'Nenhum'}</span>
                 </p>
               </div>
             )}
 
             {onlineTransferCandidates.length > 0 ? (
               <div>
-                <p className="text-sm font-medium mb-3">Atendentes disponíveis</p>
+                <p className="text-sm font-medium mb-3">Atendentes disponÃ­veis</p>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                   {onlineTransferCandidates.map((onlineUser) => {
                     const selected = transferTargetUserId === onlineUser.id;
@@ -1221,7 +1283,7 @@ function ChatPageContent() {
               </div>
             ) : (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 text-center">
-                Nenhum outro usuário está online no chat no momento.
+                Nenhum outro usuÃ¡rio estÃ¡ online no chat no momento.
               </div>
             )}
           </div>
@@ -1243,7 +1305,7 @@ function ChatPageContent() {
           <DialogHeader>
             <DialogTitle className="text-red-600">Encerrar atendimento</DialogTitle>
             <DialogDescription>
-              A conversa sairá da sua lista ativa. Se o cliente enviar uma nova mensagem, ela voltará automaticamente para o inbox sem responsável.
+              A conversa sairÃ¡ da sua lista ativa. Se o cliente enviar uma nova mensagem, ela voltarÃ¡ automaticamente para o inbox sem responsÃ¡vel.
             </DialogDescription>
           </DialogHeader>
 
@@ -1277,7 +1339,7 @@ function ChatPageContent() {
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-border bg-card">
             <DialogTitle>Iniciar Novo Atendimento</DialogTitle>
             <DialogDescription>
-              Abra uma conversa ativa com um cliente informando o número. Você pode opcionalmente já enviar a primeira mensagem.
+              Abra uma conversa ativa com um cliente informando o nÃºmero. VocÃª pode opcionalmente jÃ¡ enviar a primeira mensagem.
             </DialogDescription>
           </DialogHeader>
 
@@ -1291,7 +1353,7 @@ function ChatPageContent() {
                 onChange={(e) => setNewConversationPhone(e.target.value)}
               />
               <p className="text-xs mt-1.5 text-muted-foreground">
-                Obrigatório incluir DDI (Ex: Brasil = 55) + DDD + Número. Apenas números.
+                ObrigatÃ³rio incluir DDI (Ex: Brasil = 55) + DDD + NÃºmero. Apenas nÃºmeros.
               </p>
             </div>
 
@@ -1309,7 +1371,7 @@ function ChatPageContent() {
               <label className="block text-sm font-medium mb-1.5 text-foreground">Mensagem Inicial (Opcional)</label>
               <textarea
                 className="input w-full min-h-[120px] resize-none bg-background rounded-xl border-border"
-                placeholder="Olá, como podemos ajudar?"
+                placeholder="OlÃ¡, como podemos ajudar?"
                 value={newConversationInitialMessage}
                 onChange={(e) => setNewConversationInitialMessage(e.target.value)}
               />
@@ -1344,3 +1406,4 @@ export default function ChatPage() {
     </Suspense>
   );
 }
+

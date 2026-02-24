@@ -3,6 +3,7 @@ import Sidebar from '@/components/sidebar';
 import WhatsAppGlobalAlerts from '@/components/whatsapp-global-alerts';
 import { CRMProvider } from '@/context/crm-context';
 import { FunnelProvider } from '@/context/funnel-context';
+import { WhatsAppSocketProvider } from '@/context/whatsapp-socket-context';
 
 export const viewport = {
   themeColor: '#11182b',
@@ -31,10 +32,12 @@ export default function MainLayout({
 
           {/* ÃREA DAS PÃGINAS */}
           <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 section-content">
-            <CRMProvider>
-              {children}
-              <WhatsAppGlobalAlerts />
-            </CRMProvider>
+            <WhatsAppSocketProvider>
+              <CRMProvider>
+                {children}
+                <WhatsAppGlobalAlerts />
+              </CRMProvider>
+            </WhatsAppSocketProvider>
           </div>
         </FunnelProvider>
       </main>

@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { io, type Socket } from "socket.io-client"
+import { usePathname } from "next/navigation"
 
-import { getMe } from "@/lib/auth"
+import { useWhatsAppSocket } from "@/context/whatsapp-socket-context"
 import {
   connectWhatsApp,
   getWhatsAppStatus,
@@ -16,12 +16,6 @@ import {
   WHATSAPP_ALERT_PREFS_EVENT,
   readWhatsAppAlertPreferences,
 } from "@/lib/whatsapp-alert-preferences"
-
-type AuthUser = {
-  id: string
-  name: string
-  email: string
-}
 
 type WhatsAppSocketMessageEvent = {
   conversationId: string
@@ -36,11 +30,6 @@ type GlobalAlertToast = {
   conversationId: string
 }
 
-function getSocketBaseUrl() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
-  return apiUrl.replace(/\/api\/?$/, "")
-}
-
 function getConversationTitle(conversation?: WhatsAppConversation | null) {
   if (!conversation) return "Nova mensagem"
   return (
@@ -53,30 +42,14 @@ function getConversationTitle(conversation?: WhatsAppConversation | null) {
 }
 
 export default function WhatsAppGlobalAlerts() {
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const pathname = usePathname()
+  const { user, socket } = useWhatsAppSocket()
   const [toasts, setToasts] = useState<GlobalAlertToast[]>([])
   const [prefs, setPrefs] = useState<WhatsAppAlertPreferences>(DEFAULT_WHATSAPP_ALERT_PREFERENCES)
-  const socketRef = useRef<Socket | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
   const alertedMessageIdsRef = useRef<Set<string>>(new Set())
   const timeoutMapRef = useRef<Map<string, number>>(new Map())
   const autoConnectAttemptedRef = useRef(false)
-
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const me = await getMe()
-        if (!mounted || !me?.id) return
-        setUser(me)
-      } catch {
-        // ignore outside auth/session
-      }
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   useEffect(() => {
     setPrefs(readWhatsAppAlertPreferences())
@@ -157,6 +130,7 @@ export default function WhatsAppGlobalAlerts() {
 
   function pushToastAndNotify(payload: WhatsAppSocketMessageEvent) {
     if (!payload?.message || payload.message.fromMe || !payload.message.id) return
+    if (pathname?.startsWith("/main/chat")) return
 
     if (
       user &&
@@ -221,24 +195,17 @@ export default function WhatsAppGlobalAlerts() {
   }
 
   useEffect(() => {
-    if (!user) return
+    if (!socket) return
 
-    const socket = io(getSocketBaseUrl(), {
-      withCredentials: true,
-      transports: ["websocket"],
-      autoConnect: true,
-    })
-
-    socketRef.current = socket
-    socket.on("whatsapp:message.created", (payload: WhatsAppSocketMessageEvent) => {
+    const handleMessageCreated = (payload: WhatsAppSocketMessageEvent) => {
       pushToastAndNotify(payload)
-    })
+    }
+    socket.on("whatsapp:message.created", handleMessageCreated)
 
     return () => {
-      socket.disconnect()
-      socketRef.current = null
+      socket.off("whatsapp:message.created", handleMessageCreated)
     }
-  }, [user, prefs.inAppToastEnabled, prefs.browserNotificationEnabled, prefs.soundEnabled])
+  }, [socket, pathname, user, prefs.inAppToastEnabled, prefs.browserNotificationEnabled, prefs.soundEnabled])
 
   useEffect(() => {
     if (!user?.id) return
