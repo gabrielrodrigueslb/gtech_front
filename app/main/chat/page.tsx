@@ -738,16 +738,6 @@ function ChatPageContent() {
               {status.phoneNumber}
             </div>
           )}
-          {status?.status && status.status !== 'disconnected' && (
-            <button
-              className="btn border border-red-200 text-red-600 hover:bg-red-50"
-              onClick={() => handleDisconnect(true)}
-              disabled={isConnecting}
-              title="Desconecta o nÃºmero atual e limpa a sessÃ£o para gerar novo QR"
-            >
-              Desconectar nÃºmero
-            </button>
-          )}
           <button
             className="btn btn-primary"
             onClick={() => setIsNewConversationModalOpen(true)}
@@ -1121,11 +1111,12 @@ function ChatPageContent() {
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {status?.status === 'connected' ? (
+                  {status?.status && status.status !== 'disconnected' ? (
                     <button className="btn border border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleDisconnect(true)} disabled={isConnecting}>
                       Desconectar nÃºmero
                     </button>
-                  ) : (
+                  ) : null}
+                  {status?.status !== 'connected' && (
                     <button className="btn btn-primary" onClick={handleConnect} disabled={isConnecting}>
                       {isConnecting ? 'Conectando...' : 'Conectar / Gerar QR'}
                     </button>
