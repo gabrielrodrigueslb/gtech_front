@@ -48,10 +48,6 @@ export type WhatsAppMessage = {
 export async function getWhatsAppStatus() {
   const { data } = await api.get<WhatsAppStatus>('/whatsapp/status', {
     params: { _ts: Date.now() },
-    headers: {
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
   })
   return data
 }
