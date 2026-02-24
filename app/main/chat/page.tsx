@@ -743,7 +743,7 @@ function ChatPageContent() {
           const nextStatus = await getWhatsAppStatus();
           setStatus(nextStatus);
           const normalized = String(nextStatus?.status || '').toLowerCase();
-          if (['qr', 'connected', 'error', 'logged_out'].includes(normalized)) break;
+          if (['qr', 'connected', 'error', 'logged_out', 'disconnected'].includes(normalized)) break;
         }
       }
     } catch (error: any) {
@@ -759,6 +759,12 @@ function ChatPageContent() {
   }
 
   async function handleGenerateQr() {
+    if (String(status?.status || '').toLowerCase() === 'connected') {
+      const confirmed = window.confirm(
+        'Ha um numero conectado. Deseja desconectar e gerar um novo QR agora?',
+      );
+      if (!confirmed) return;
+    }
     await handleConnectFlow('qr');
   }
 
@@ -1447,23 +1453,21 @@ function ChatPageContent() {
                       : 'Limpar sessão antiga'}
                   </button>
                   {status?.status !== 'connected' && (
-                    <>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={handleReconnectSession}
-                        disabled={isConnecting}
-                      >
-                        {isConnecting ? 'Conectando...' : 'Reconectar sessao'}
-                      </button>
-                      <button
-                        className="btn btn-primary"
-                        onClick={handleGenerateQr}
-                        disabled={isConnecting}
-                      >
-                        {isConnecting ? 'Conectando...' : 'Gerar novo QR'}
-                      </button>
-                    </>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={handleReconnectSession}
+                      disabled={isConnecting}
+                    >
+                      {isConnecting ? 'Conectando...' : 'Reconectar sessao'}
+                    </button>
                   )}
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleGenerateQr}
+                    disabled={isConnecting}
+                  >
+                    {isConnecting ? 'Conectando...' : 'Gerar novo QR'}
+                  </button>
                   <button
                     className="btn btn-secondary"
                     onClick={() => loadStatus(true)}
