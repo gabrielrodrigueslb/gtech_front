@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -38,6 +39,7 @@ export function WhatsAppSocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isLoadingUser, setIsLoadingUser] = useState(true)
+  const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -63,14 +65,20 @@ export function WhatsAppSocketProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user?.id) {
       setIsConnected(false)
-      if (socket) {
-        socket.disconnect()
-        setSocket(null)
+      const currentSocket = socketRef.current
+      if (currentSocket) {
+        currentSocket.disconnect()
+        socketRef.current = null
       }
+      setSocket(null)
       return
     }
 
-    if (socket) return
+    if (socketRef.current) {
+      setSocket(socketRef.current)
+      setIsConnected(socketRef.current.connected)
+      return
+    }
 
     const nextSocket = io(getSocketBaseUrl(), {
       withCredentials: true,
@@ -86,6 +94,7 @@ export function WhatsAppSocketProvider({ children }: { children: ReactNode }) {
     nextSocket.on("disconnect", handleDisconnect)
     nextSocket.on("connect_error", handleConnectError)
 
+    socketRef.current = nextSocket
     setSocket(nextSocket)
     setIsConnected(nextSocket.connected)
 
@@ -93,11 +102,14 @@ export function WhatsAppSocketProvider({ children }: { children: ReactNode }) {
       nextSocket.off("connect", handleConnect)
       nextSocket.off("disconnect", handleDisconnect)
       nextSocket.off("connect_error", handleConnectError)
-      nextSocket.disconnect()
-      setSocket((current) => (current === nextSocket ? null : current))
-      setIsConnected(false)
+      if (socketRef.current === nextSocket) {
+        nextSocket.disconnect()
+        socketRef.current = null
+        setSocket(null)
+        setIsConnected(false)
+      }
     }
-  }, [user?.id, socket])
+  }, [user?.id])
 
   const value = useMemo(
     () => ({
