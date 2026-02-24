@@ -729,19 +729,41 @@ function ChatPageContent() {
     }
   }
 
-  async function handleConnect() {
+  async function handleConnectFlow(mode: 'reconnect' | 'qr') {
     try {
       setIsConnecting(true);
       setErrorMessage(null);
-      const data = await connectWhatsApp();
+      const data = await connectWhatsApp({ mode });
       setStatus(data);
+
+      if (['connecting', 'disconnected'].includes(String(data?.status || '').toLowerCase())) {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < 30_000) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const nextStatus = await getWhatsAppStatus();
+          setStatus(nextStatus);
+          const normalized = String(nextStatus?.status || '').toLowerCase();
+          if (['qr', 'connected', 'error', 'logged_out'].includes(normalized)) break;
+        }
+      }
     } catch (error: any) {
       setErrorMessage(
-        error?.response?.data?.error || 'Erro ao conectar WhatsApp',
+        error?.response?.data?.error ||
+          (mode === 'qr'
+            ? 'Erro ao gerar novo QR'
+            : 'Erro ao reconectar WhatsApp'),
       );
     } finally {
       setIsConnecting(false);
     }
+  }
+
+  async function handleGenerateQr() {
+    await handleConnectFlow('qr');
+  }
+
+  async function handleReconnectSession() {
+    await handleConnectFlow('reconnect');
   }
 
   async function handleDisconnect(resetSession = false) {
@@ -1115,10 +1137,10 @@ function ChatPageContent() {
               </p>
               <button
                 className="btn btn-primary"
-                onClick={handleConnect}
+                onClick={handleGenerateQr}
                 disabled={isConnecting}
               >
-                {isConnecting ? 'Conectando...' : 'Gerar QR Code'}
+                {isConnecting ? 'Conectando...' : 'Gerar novo QR'}
               </button>
             </div>
           )}
@@ -1425,13 +1447,22 @@ function ChatPageContent() {
                       : 'Limpar sessão antiga'}
                   </button>
                   {status?.status !== 'connected' && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={handleConnect}
-                      disabled={isConnecting}
-                    >
-                      {isConnecting ? 'Conectando...' : 'Conectar / Gerar QR'}
-                    </button>
+                    <>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={handleReconnectSession}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? 'Conectando...' : 'Reconectar sessao'}
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleGenerateQr}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? 'Conectando...' : 'Gerar novo QR'}
+                      </button>
+                    </>
                   )}
                   <button
                     className="btn btn-secondary"

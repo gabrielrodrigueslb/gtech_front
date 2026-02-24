@@ -223,7 +223,7 @@ export default function WhatsAppGlobalAlerts() {
 
         if (!shouldConnect) return
 
-        await connectWhatsApp()
+        await connectWhatsApp({ mode: "reconnect" })
       } catch (error) {
         console.warn("WhatsApp auto-connect falhou:", error)
       }

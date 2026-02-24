@@ -50,8 +50,11 @@ export async function getWhatsAppStatus() {
   return data
 }
 
-export async function connectWhatsApp() {
-  const { data } = await api.post<WhatsAppStatus>('/whatsapp/connect')
+export async function connectWhatsApp(params?: {
+  resetSession?: boolean
+  mode?: 'reconnect' | 'qr'
+}) {
+  const { data } = await api.post<WhatsAppStatus>('/whatsapp/connect', params || {})
   return data
 }
 
