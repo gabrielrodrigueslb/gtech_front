@@ -80,7 +80,7 @@ export default function Sidebar() {
 
   return (
     <aside className="m-3 md:py-10 bg-sidebar-foreground rounded-3xl shadow-lg shrink-0 flex flex-col md:items-center max-md:overflow-scroll">
-      <Image src="/logo_dark.png" width={20} quality={100} height={20} className='w-15 pb-10 select-none hidden md:block' alt="" />
+      <Image src="/logo_dark.png" width={20} height={20} className='w-15 pb-10 select-none hidden md:block' alt="" />
       <nav className=" h-full w-20  p-4">
         <ul className=" flex flex-col gap-3 items-center">
           {menuItems.map((item) => (

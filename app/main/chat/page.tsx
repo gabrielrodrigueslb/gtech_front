@@ -271,7 +271,7 @@ function formatConversationListTime(value?: string | null) {
 
 function ChatPageContent() {
   const searchParams = useSearchParams();
-  const { user, socket: sharedSocket } = useWhatsAppSocket();
+  const { user, socket: sharedSocket, isLoadingUser } = useWhatsAppSocket();
   const [status, setStatus] = useState<WhatsAppStatus | null>(null);
   const [conversations, setConversations] = useState<WhatsAppConversation[]>(
     [],
@@ -422,6 +422,8 @@ function ChatPageContent() {
   }, []);
 
   useEffect(() => {
+    if (isLoadingUser || !user?.id) return;
+
     void loadStatus(true);
 
     const onVisibilityChange = () => {
@@ -435,13 +437,15 @@ function ChatPageContent() {
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, []);
+  }, [isLoadingUser, user?.id]);
 
   useEffect(() => {
+    if (isLoadingUser || !user?.id) return;
     void loadConversations(true);
-  }, [scope, search]);
+  }, [scope, search, isLoadingUser, user?.id]);
 
   useEffect(() => {
+    if (isLoadingUser || !user?.id) return;
     if (isRealtimeConnected) return;
 
     const interval = window.setInterval(() => {
@@ -453,7 +457,7 @@ function ChatPageContent() {
     }, 45000);
 
     return () => window.clearInterval(interval);
-  }, [isRealtimeConnected, scope, search]);
+  }, [isRealtimeConnected, scope, search, isLoadingUser, user?.id]);
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -461,9 +465,24 @@ function ChatPageContent() {
       setSelectedConversation(null);
       return;
     }
+    if (isLoadingUser || !user?.id) return;
     loadConversationMessages(selectedConversationId, true);
     markWhatsAppConversationRead(selectedConversationId).catch(() => {});
-  }, [selectedConversationId]);
+  }, [selectedConversationId, isLoadingUser, user?.id]);
+
+  useEffect(() => {
+    if (isLoadingUser) return;
+    if (user?.id) return;
+
+    setStatus(null);
+    setConversations([]);
+    setMessages([]);
+    setSelectedConversation(null);
+    setSelectedConversationId(null);
+    setPresence({ onlineUsers: [], onlineCount: 0 });
+    setIsLoadingStatus(false);
+    setIsLoadingConversations(false);
+  }, [isLoadingUser, user?.id]);
 
   useEffect(() => {
     const socket = sharedSocket;
@@ -637,6 +656,10 @@ function ChatPageContent() {
   }, [messages]);
 
   async function loadStatus(force = false) {
+    if (!user?.id) {
+      setIsLoadingStatus(false);
+      return;
+    }
     if (!force) {
       if (statusRequestInFlightRef.current) return;
       if (socketConnectedRef.current) return;
@@ -663,6 +686,10 @@ function ChatPageContent() {
   }
 
   async function loadConversations(force = false) {
+    if (!user?.id) {
+      setIsLoadingConversations(false);
+      return;
+    }
     if (!force) {
       if (conversationsRequestInFlightRef.current) return;
       if (
@@ -712,6 +739,10 @@ function ChatPageContent() {
     conversationId: string,
     forceScroll: boolean,
   ) {
+    if (!user?.id) {
+      setIsLoadingMessages(false);
+      return;
+    }
     try {
       if (forceScroll) setIsLoadingMessages(true);
       shouldAutoScrollRef.current = forceScroll;
@@ -1475,6 +1506,29 @@ function ChatPageContent() {
                     Atualizar status
                   </button>
                 </div>
+
+                {status?.status === 'qr' && (
+                  <div className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Escaneie o QR Code abaixo com o WhatsApp para conectar este número.
+                    </p>
+                    {status.qrCodeDataUrl ? (
+                      <div className="flex justify-center">
+                        <div className="rounded-xl bg-white p-3 shadow-sm">
+                          <img
+                            src={status.qrCodeDataUrl}
+                            alt="QR Code do WhatsApp"
+                            className="block h-56 w-56 sm:h-64 sm:w-64 object-contain"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-border bg-background/50 p-4 text-sm text-muted-foreground">
+                        QR solicitado. Aguarde alguns segundos e clique em "Atualizar status" se ele não aparecer.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Fila e Distribuição */}
