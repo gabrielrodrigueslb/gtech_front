@@ -269,7 +269,7 @@ function formatConversationListTime(value?: string | null) {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 }
 
-function ChatPageContent() {
+function ChatPageInner() {
   const searchParams = useSearchParams();
   const { user, socket: sharedSocket, isLoadingUser } = useWhatsAppSocket();
   const [status, setStatus] = useState<WhatsAppStatus | null>(null);
@@ -375,6 +375,11 @@ function ChatPageContent() {
     () => getConversationIdentifier(activeConversation),
     [activeConversation],
   );
+  const canReplyToActiveConversation = useMemo(() => {
+    if (!activeConversation) return false;
+    if (!activeConversation.assignedUserId) return true;
+    return activeConversation.assignedUserId === user?.id;
+  }, [activeConversation, user?.id]);
 
   const renderConversationTitle = (conversation: WhatsAppConversation) =>
     conversation.contact?.name ||
@@ -494,6 +499,8 @@ function ChatPageContent() {
     const handleSocketConnect = () => {
       socketConnectedRef.current = true;
       setIsRealtimeConnected(true);
+      socket.emit('whatsapp:presence.request');
+      socket.emit('whatsapp:status.request');
       void loadStatus(true);
       void loadConversations(true);
       if (selectedConversationIdRef.current) {
@@ -620,6 +627,12 @@ function ChatPageContent() {
     socket.on('whatsapp:conversation.updated', handleConversationUpdated);
     socket.on('whatsapp:message.created', handleMessageCreated);
     socket.on('connect_error', handleConnectError);
+
+    // Se a tela montar depois do socket global já estar conectado, recupera snapshot atual.
+    if (socket.connected) {
+      socket.emit('whatsapp:presence.request');
+      socket.emit('whatsapp:status.request');
+    }
 
     return () => {
       socketConnectedRef.current = false;
@@ -822,6 +835,10 @@ function ChatPageContent() {
 
   async function handleSendMessage() {
     if (!selectedConversationId || !composerText.trim()) return;
+    if (!canReplyToActiveConversation) {
+      setErrorMessage('Esta conversa está atribuída a outro usuário.');
+      return;
+    }
     try {
       setIsSending(true);
       setErrorMessage(null);
@@ -863,11 +880,36 @@ function ChatPageContent() {
     try {
       setIsTransferring(true);
       setErrorMessage(null);
-      await assignWhatsAppConversation(
+      const updatedConversation = await assignWhatsAppConversation(
         selectedConversationId,
         transferTargetUserId,
       );
+
+      if (updatedConversation?.id) {
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === updatedConversation.id ? { ...c, ...updatedConversation } : c,
+          ),
+        );
+        if (selectedConversationIdRef.current === updatedConversation.id) {
+          setSelectedConversation((prev) =>
+            ({ ...(prev || {}), ...updatedConversation }) as WhatsAppConversation,
+          );
+        }
+      }
+
       setIsTransferModalOpen(false);
+
+      const transferredToAnotherUser = transferTargetUserId !== user?.id;
+
+      if (scope === 'mine' && transferredToAnotherUser) {
+        setSelectedConversationId(null);
+        setSelectedConversation(null);
+        setMessages([]);
+        await loadConversations(true);
+        return;
+      }
+
       await Promise.all([
         loadConversations(),
         loadConversationMessages(selectedConversationId, false),
@@ -944,7 +986,7 @@ function ChatPageContent() {
   }, [conversations, user]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-background">
+    <>
       {/* HEADER PRINCIPAL - Oculto no mobile se houver um chat aberto */}
       <header
         className={`flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 xl:mb-6 ${selectedConversationId ? 'hidden md:flex' : 'flex'}`}
@@ -1243,6 +1285,7 @@ function ChatPageContent() {
                   <button
                     className="p-2 text-primary hover:bg-primary/10 rounded-full cursor-pointer"
                     onClick={() => {
+                      socketRef.current?.emit('whatsapp:presence.request');
                       const defaultTarget =
                         onlineTransferCandidates.find(
                           (c) => c.id !== activeConversation.assignedUserId,
@@ -1384,7 +1427,9 @@ function ChatPageContent() {
                     className="flex-1 bg-muted/50 border-none focus:ring-0 resize-none rounded-2xl px-4 py-3 text-[15px] max-h-32 shadow-sm"
                     rows={1}
                     placeholder={
-                      status?.status === 'connected'
+                      !canReplyToActiveConversation
+                        ? 'Conversa atribuída a outro usuário'
+                        : status?.status === 'connected'
                         ? 'Digite uma mensagem...'
                         : 'Conecte para enviar mensagens'
                     }
@@ -1400,16 +1445,21 @@ function ChatPageContent() {
                         if (!isSending) void handleSendMessage();
                       }
                     }}
-                    disabled={status?.status !== 'connected' || isSending}
+                    disabled={
+                      status?.status !== 'connected' ||
+                      isSending ||
+                      !canReplyToActiveConversation
+                    }
                   />
                   <button
                     className={`p-3.5 rounded-full flex items-center justify-center transition-transform shrink-0 mb-0.5 cursor-pointer
-                      ${!composerText.trim() || isSending ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground shadow-md hover:scale-105'}`}
+                      ${!composerText.trim() || isSending || !canReplyToActiveConversation ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground shadow-md hover:scale-105'}`}
                     onClick={handleSendMessage}
                     disabled={
                       isSending ||
                       status?.status !== 'connected' ||
-                      !composerText.trim()
+                      !composerText.trim() ||
+                      !canReplyToActiveConversation
                     }
                   >
                     <Send size={18} className={isSending ? 'opacity-50' : ''} />
@@ -1749,10 +1799,10 @@ function ChatPageContent() {
 
           <DialogFooter>
             <button
-              className="btn btn-ghost"
-              onClick={() => setIsTransferModalOpen(false)}
-              disabled={isTransferring}
-            >
+                    className="btn btn-ghost"
+                    onClick={() => setIsTransferModalOpen(false)}
+                    disabled={isTransferring}
+                  >
               Cancelar
             </button>
             <button
@@ -1895,20 +1945,26 @@ function ChatPageContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+function ChatPageContent() {
+  return (
+    <div className="flex flex-col h-full min-h-0 bg-background">
+      <Suspense
+        fallback={
+          <div className="flex flex-1 min-h-0 items-center justify-center rounded-2xl border border-border bg-card">
+            <p className="text-sm text-muted-foreground">Carregando chat...</p>
+          </div>
+        }
+      >
+        <ChatPageInner />
+      </Suspense>
     </div>
   );
 }
 
 export default function ChatPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-border bg-card">
-          <p className="text-sm text-muted-foreground">Carregando chat...</p>
-        </div>
-      }
-    >
-      <ChatPageContent />
-    </Suspense>
-  );
+  return <ChatPageContent />;
 }
