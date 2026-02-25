@@ -1322,7 +1322,7 @@ function ChatPageContent() {
                             </p>
                           )}
                           <p className="whitespace-pre-wrap wrap-break-word text-[14px] sm:text-[15px] leading-relaxed">
-                            {displayBody || '(mÃ­dia/mensagem não suportada)'}
+                            {displayBody || '(mídia/mensagem não suportada)'}
                           </p>
                           <div
                             className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
@@ -1363,7 +1363,7 @@ function ChatPageContent() {
                 {activeConversation.assignedUserId !== user?.id &&
                   activeConversation.assignedUserId && (
                     <div className="mb-3 p-2 bg-yellow-50 text-yellow-800 text-xs rounded-md border border-yellow-200 text-center">
-                      Esta conversa está atribuÃ­da a outro usuário.
+                      Esta conversa está atribuída a outro usuário.
                     </div>
                   )}
                 {!activeConversation.assignedUserId && (
@@ -1437,7 +1437,7 @@ function ChatPageContent() {
         </section>
       </div>
 
-      {/* MODAL DE CONFIGURAÃ‡Ã•ES */}
+      {/* MODAL DE CONFIGURAÇÕES */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent className="w-[min(56rem,calc(100vw-1rem))] max-w-none max-h-[90vh] min-h-0 overflow-hidden p-0 gap-0 flex flex-col rounded-2xl">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-border bg-card">
@@ -1634,7 +1634,7 @@ function ChatPageContent() {
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Alertas do sistema operacional mesmo se a aba não
-                        estiver visÃ­vel.
+                        estiver visível.
                       </p>
                     </div>
                     <Switch
@@ -1681,7 +1681,7 @@ function ChatPageContent() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DE TRANSFERÃŠNCIA */}
+      {/* MODAL DE TRANSFERÊNCIA */}
       <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
@@ -1712,7 +1712,7 @@ function ChatPageContent() {
             {onlineTransferCandidates.length > 0 ? (
               <div>
                 <p className="text-sm font-medium mb-3">
-                  Atendentes disponÃ­veis
+                  Atendentes disponíveis
                 </p>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                   {onlineTransferCandidates.map((onlineUser) => {
