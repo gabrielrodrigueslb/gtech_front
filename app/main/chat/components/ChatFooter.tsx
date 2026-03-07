@@ -17,7 +17,7 @@ import {
   normalizeWhatsAppMediaMimeType,
   sendMediaMessage,
   sendMessage,
-} from '@/lib/Whatsapp'
+} from '@/lib/whatsapp-client'
 import { getMe } from '@/lib/auth'
 import AudioBars from './AudioBars'
 import ChatAudioPlayer from './ChatAudioPlayer'

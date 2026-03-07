@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Building2, Mail, Pencil, Phone, Tags, UserRound, X } from 'lucide-react'
 import { getContactById, type Contact } from '@/lib/contact'
-import { DEFAULT_WHATSAPP_CONTACT_TAGS, getContactTags } from '@/lib/Whatsapp'
+import { DEFAULT_WHATSAPP_CONTACT_TAGS, getContactTags } from '@/lib/whatsapp-client'
 import type { ConversationPresence, WhatsAppConversation } from '@/types/Whatsapp.types'
 import UserProfile from './UserProfile'
 

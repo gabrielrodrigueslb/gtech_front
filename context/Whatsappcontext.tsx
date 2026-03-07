@@ -19,7 +19,7 @@ import {
   markConversationAsRead,
   saveConversationContact as saveConversationContactApi,
   type SaveConversationContactInput,
-} from '@/lib/Whatsapp'
+} from '@/lib/whatsapp-client'
 import type {
   ConversationPresence,
   CRMContact,

@@ -3,7 +3,7 @@
 import { CheckCheck, Clock } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useWhatsApp } from '@/context/Whatsappcontext'
-import { resolveWhatsAppMediaUrl } from '@/lib/Whatsapp'
+import { resolveWhatsAppMediaUrl } from '@/lib/whatsapp-client'
 import { useConversationAvatar } from '@/hooks/useConversationAvatar'
 import ChatAudioPlayer from './ChatAudioPlayer'
 import UserProfile from './UserProfile'

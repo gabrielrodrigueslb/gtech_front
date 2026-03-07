@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getConversationProfile } from '@/lib/Whatsapp'
+import { getConversationProfile } from '@/lib/whatsapp-client'
 
 const avatarCache = new Map<string, string | null>()
 

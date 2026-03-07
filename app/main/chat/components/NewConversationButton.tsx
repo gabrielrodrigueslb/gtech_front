@@ -2,7 +2,7 @@
 
 import { CirclePlus } from 'lucide-react'
 import { useState } from 'react'
-import { openConversation } from '@/lib/Whatsapp'
+import { openConversation } from '@/lib/whatsapp-client'
 import { useWhatsApp } from '@/context/Whatsappcontext'
 
 export default function NewConversationButton() {

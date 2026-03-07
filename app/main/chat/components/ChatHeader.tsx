@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import UserProfile from './UserProfile'
 import ConversationDetailsDrawer from './ConversationDetailsDrawer'
 import { useWhatsApp } from '@/context/Whatsappcontext'
-import { DEFAULT_WHATSAPP_CLOSE_REASONS, getCloseReasons } from '@/lib/Whatsapp'
+import { DEFAULT_WHATSAPP_CLOSE_REASONS, getCloseReasons } from '@/lib/whatsapp-client'
 import { useConversationAvatar } from '@/hooks/useConversationAvatar'
 
 type ChatHeaderProps = {

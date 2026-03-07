@@ -13,7 +13,7 @@ import {
   getCloseReasons,
   getWhatsAppSession,
   logoutWhatsApp,
-} from '@/lib/Whatsapp';
+} from '@/lib/whatsapp-client';
 import type { WhatsAppSession } from '@/types/Whatsapp.types';
 import { io, type Socket } from 'socket.io-client';
 import {
