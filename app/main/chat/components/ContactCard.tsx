@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react'
 import UserProfile from './UserProfile'
 import { useConversationAvatar } from '@/hooks/useConversationAvatar'
 
 interface ContactProps {
   conversationId: string
   lastMessage: string
+  lastMessageIcon?: ReactNode
+  isPreviewHighlight?: boolean
   nomeContato: string
   hora: string
   online: boolean
@@ -17,6 +20,8 @@ interface ContactProps {
 export default function ContactCard({
   conversationId,
   lastMessage,
+  lastMessageIcon,
+  isPreviewHighlight = false,
   nomeContato,
   hora,
   online,
@@ -43,7 +48,10 @@ export default function ContactCard({
         </span>
 
         <span className="flex justify-between items-center gap-3">
-          <p className="opacity-50 text-sm truncate">{lastMessage}</p>
+          <p className={`flex items-center gap-2 text-sm truncate ${isPreviewHighlight ? 'text-emerald-400 opacity-100' : 'opacity-50'}`}>
+            {lastMessageIcon ? <span className="shrink-0">{lastMessageIcon}</span> : null}
+            <span className="truncate">{lastMessage}</span>
+          </p>
 
           <span className="flex items-center gap-1 shrink-0">
             {status === 'CLOSED' && (

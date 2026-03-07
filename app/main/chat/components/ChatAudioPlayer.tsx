@@ -8,7 +8,7 @@ type ChatAudioPlayerProps = {
   src: string
   mimeType?: string | null
   label?: string
-  variant?: 'bubble' | 'panel'
+  variant?: 'bubble' | 'panel' | 'inline'
 }
 
 function formatTime(totalSeconds: number) {
@@ -89,13 +89,16 @@ export default function ChatAudioPlayer({
   }
 
   const isPanel = variant === 'panel'
+  const isInline = variant === 'inline'
 
   return (
     <div
       className={
         isPanel
           ? 'rounded-2xl border border-white/10 bg-black/15 px-4 py-3'
-          : 'rounded-xl px-0 py-1'
+          : isInline
+            ? 'rounded-none border-0 bg-transparent px-0 py-0'
+          : 'rounded-[18px] border border-white/10 bg-black/10 px-3 py-2.5'
       }
     >
       <audio ref={audioRef} preload="metadata">
@@ -106,8 +109,12 @@ export default function ChatAudioPlayer({
         <button
           type="button"
           onClick={togglePlayback}
-          className={`flex shrink-0 items-center justify-center rounded-full text-white transition hover:opacity-90 ${
-            isPanel ? 'h-11 w-11 bg-primary' : 'h-10 w-10 bg-black/20 ring-1 ring-white/10'
+          className={`flex shrink-0 cursor-pointer items-center justify-center rounded-full text-white transition hover:opacity-90 ${
+            isPanel
+              ? 'h-11 w-11 bg-primary'
+              : isInline
+                ? 'h-10 w-10 border border-primary/25 bg-primary/15 text-primary'
+                : 'h-9 w-9 bg-white/10'
           }`}
         >
           {isPlaying ? <Pause size={18} /> : <Play size={18} className="translate-x-[1px]" />}
@@ -115,15 +122,21 @@ export default function ChatAudioPlayer({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-3">
-            <p
-              className={`truncate text-xs font-medium uppercase tracking-[0.18em] ${
-                isPanel ? 'text-white/45' : 'text-white/50'
-              }`}
-            >
-              {label}
-            </p>
+            {isPanel ? (
+              <p className="truncate text-xs font-medium uppercase tracking-[0.18em] text-white/45">
+                {label}
+              </p>
+            ) : isInline ? (
+              <p className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-white/35">
+                {label}
+              </p>
+            ) : (
+              <p className="sr-only">{label}</p>
+            )}
             <span className="shrink-0 text-xs text-white/55">
-              {formatTime(currentTime)} / {formatTime(duration)}
+              {isPanel || isInline
+                ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+                : formatTime(duration)}
             </span>
           </div>
 
@@ -131,7 +144,7 @@ export default function ChatAudioPlayer({
             progress={progress}
             isActive={isPlaying}
             liveLevel={isPlaying ? 0.45 : 0}
-            className="mt-3"
+            className={isPanel ? 'mt-3' : isInline ? 'mt-1.5' : 'mt-2'}
           />
 
           <input
@@ -141,8 +154,8 @@ export default function ChatAudioPlayer({
             step={1}
             value={Math.round(progress * 1000)}
             onChange={handleSeek}
-            className={`mt-3 h-1.5 w-full cursor-pointer appearance-none rounded-full accent-primary ${
-              isPanel ? 'bg-white/10' : 'bg-white/8'
+            className={`mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full accent-primary ${
+              isPanel ? 'bg-white/10' : isInline ? 'bg-white/10' : 'bg-white/8'
             }`}
           />
         </div>

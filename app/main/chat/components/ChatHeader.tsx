@@ -3,17 +3,54 @@
 import { ArrowLeftRight, EllipsisVertical, MessageSquareX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import UserProfile from './UserProfile'
+import ConversationDetailsDrawer from './ConversationDetailsDrawer'
 import { useWhatsApp } from '@/context/Whatsappcontext'
 import { DEFAULT_WHATSAPP_CLOSE_REASONS, getCloseReasons } from '@/lib/Whatsapp'
 import { useConversationAvatar } from '@/hooks/useConversationAvatar'
 
+function formatPhone(value?: string | null) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.length === 13) {
+    return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`
+  }
+  if (digits.length === 12) {
+    return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`
+  }
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+  }
+  return digits
+}
+
+function getContactLabel(phone?: string | null) {
+  return formatPhone(phone)
+}
+
+function getConversationPhone(phone?: string | null, remoteJid?: string | null) {
+  return phone ?? String(remoteJid ?? '').split('@')[0] ?? ''
+}
+
 export default function ChatHeader() {
-  const { activeConversation, closeConversation } = useWhatsApp()
+  const {
+    activeConversation,
+    closeConversation,
+    assignConversation,
+    saveConversationContact,
+    agents,
+    currentUserId,
+  } = useWhatsApp()
   const avatarUrl = useConversationAvatar(activeConversation?.id ?? null)
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false)
   const [closeReasonOptions, setCloseReasonOptions] = useState(DEFAULT_WHATSAPP_CLOSE_REASONS)
   const [closeReason, setCloseReason] = useState(DEFAULT_WHATSAPP_CLOSE_REASONS[0])
   const [isClosing, setIsClosing] = useState(false)
+  const [isTransferring, setIsTransferring] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -52,6 +89,8 @@ export default function ChatHeader() {
 
   const isClosed = activeConversation.status === 'CLOSED'
 
+  const transferTargets = agents.filter((agent) => agent.isOnline && agent.id !== currentUserId)
+
   function openCloseModal() {
     if (!activeConversation || isClosed) return
     setCloseReason(closeReasonOptions[0] ?? DEFAULT_WHATSAPP_CLOSE_REASONS[0])
@@ -77,43 +116,119 @@ export default function ChatHeader() {
     }
   }
 
+  async function handleTransfer(userId: string) {
+    if (!activeConversation || !userId) return
+
+    setIsTransferring(true)
+    try {
+      await assignConversation(activeConversation.id, userId)
+      setIsTransferModalOpen(false)
+    } finally {
+      setIsTransferring(false)
+    }
+  }
+
   return (
     <>
-      <header className="w-full bg-card py-3 px-4 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <UserProfile online={false} username={name} avatarUrl={avatarUrl} />
-          <div className="flex flex-col flex-1 gap-1 font-light overflow-hidden max-w-xs">
+      <header className="w-full bg-card py-3 px-4 flex justify-between items-center gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <UserProfile username={name} avatarUrl={avatarUrl} />
+          <div className="flex min-w-0 flex-col flex-1 gap-1 font-light overflow-hidden">
             <h4 className="font-medium truncate">{name}</h4>
-            <p className="text-xs opacity-50">
-              {activeConversation.phone ?? activeConversation.remoteJid}
+            <p className="text-xs opacity-50 truncate">
+              {getContactLabel(getConversationPhone(activeConversation.phone, activeConversation.remoteJid))}
             </p>
           </div>
         </div>
 
-        <div>
-          <ul className="flex gap-2 items-center">
-            <li className="p-1 rounded-sm transition-all cursor-pointer hover:bg-white/20">
-              <EllipsisVertical size={20} />
-            </li>
-            <li className="p-1 rounded-sm transition-all cursor-pointer hover:bg-white/20">
-              <ArrowLeftRight size={20} />
-            </li>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsDetailsDrawerOpen(true)}
+            className="rounded-xl p-2 transition hover:bg-white/10 cursor-pointer"
+          >
+            <EllipsisVertical size={18} />
+          </button>
 
-            {!isClosed ? (
-              <button
-                onClick={openCloseModal}
-                className="flex gap-2 text-sm p-3 bg-primary rounded-md ml-2 cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                <MessageSquareX size={20} /> Encerrar Atendimento
-              </button>
-            ) : (
-              <span className="text-xs opacity-40 ml-2 px-3 py-2 border border-white/10 rounded-md">
-                Encerrado
-              </span>
-            )}
-          </ul>
+          <button
+            type="button"
+            onClick={() => setIsTransferModalOpen(true)}
+            className="rounded-xl p-2 transition hover:bg-white/10 cursor-pointer"
+          >
+            <ArrowLeftRight size={18} />
+          </button>
+
+          {!isClosed ? (
+            <button
+              onClick={openCloseModal}
+              className="flex gap-2 text-sm p-3 bg-primary rounded-xl ml-2 cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <MessageSquareX size={18} /> Encerrar Atendimento
+            </button>
+          ) : (
+            <span className="text-xs opacity-40 ml-2 px-3 py-2 border border-white/10 rounded-xl">
+              Encerrado
+            </span>
+          )}
         </div>
       </header>
+
+      <ConversationDetailsDrawer
+        isOpen={isDetailsDrawerOpen}
+        onClose={() => setIsDetailsDrawerOpen(false)}
+        conversation={activeConversation}
+        presence={null}
+        avatarUrl={avatarUrl}
+        onSave={saveConversationContact}
+      />
+
+      {isTransferModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-card p-6 shadow-2xl">
+            <div className="space-y-2">
+              <h3 className="text-xl font-semibold">Transferir atendimento</h3>
+              <p className="text-sm opacity-70">
+                Escolha um atendente online para receber este atendimento.
+              </p>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-2">
+              {transferTargets.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">
+                  Nenhum outro atendente esta online agora.
+                </div>
+              ) : (
+                transferTargets.map((agent) => (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => handleTransfer(agent.id)}
+                    disabled={isTransferring}
+                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-left transition hover:bg-white/8 disabled:opacity-50 cursor-pointer"
+                  >
+                    <div>
+                      <p className="font-medium">{agent.name}</p>
+                      <p className="text-xs text-white/50">{agent.email}</p>
+                    </div>
+                    <span className="text-xs text-emerald-400">Online</span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsTransferModalOpen(false)}
+                disabled={isTransferring}
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm transition hover:bg-white/5 disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isCloseModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
@@ -129,7 +244,7 @@ export default function ChatHeader() {
               <select
                 value={closeReason}
                 onChange={(e) => setCloseReason(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none"
+                className="w-full rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none cursor-pointer"
               >
                 {closeReasonOptions.map((option) => (
                   <option key={option} value={option}>
@@ -152,7 +267,7 @@ export default function ChatHeader() {
                 type="button"
                 onClick={handleCancelClose}
                 disabled={isClosing}
-                className="rounded-xl border border-white/10 px-4 py-3 text-sm transition hover:bg-white/5 disabled:opacity-50"
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm transition hover:bg-white/5 disabled:opacity-50 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -160,7 +275,7 @@ export default function ChatHeader() {
                 type="button"
                 onClick={handleConfirmClose}
                 disabled={isClosing || !closeReason.trim()}
-                className="rounded-xl bg-primary px-4 py-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-50"
+                className="rounded-xl bg-primary px-4 py-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 cursor-pointer"
               >
                 {isClosing ? 'Encerrando...' : 'Encerrar'}
               </button>

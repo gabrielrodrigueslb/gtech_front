@@ -1,3 +1,30 @@
+export interface CRMContact {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  segment?: string | null
+  company?: string | null
+  status?: 'lead' | 'prospect' | 'customer' | 'inactive' | string
+  notes?: string | null
+  tags?: string[]
+}
+
+export interface ConversationPresence {
+  remoteJid: string
+  status: 'online' | 'typing' | 'recording' | 'offline'
+  lastKnownPresence?: string
+  lastSeen?: number | null
+}
+
+export interface OnlineAgent {
+  id: string
+  name: string
+  email: string
+  active: boolean
+  isOnline: boolean
+}
+
 export interface WhatsAppSession {
   id: string
   status: 'DISCONNECTED' | 'CONNECTING' | 'QR_READY' | 'CONNECTED' | 'BANNED' | 'ERROR'
@@ -17,13 +44,15 @@ export interface WhatsAppConversation {
   waName?: string | null
   lastMessagePreview?: string | null
   lastMessageAt?: string | null
+  lastMessageType?: WhatsAppMessage['type'] | null
+  lastMessageDurationSeconds?: number | null
   unreadCount: number
   isArchived: boolean
   status: 'PENDING' | 'OPEN' | 'CLOSED' | 'ARCHIVED'
   closedAt?: string | null
   contactId?: string | null
   assignedUserId?: string | null
-  contact?: { id: string; name: string; email?: string } | null
+  contact?: CRMContact | null
   assignedUser?: { id: string; name: string } | null
 }
 
@@ -38,6 +67,7 @@ export interface WhatsAppMessage {
   mediaUrl?: string | null
   mediaType?: string | null
   mediaMimeType?: string | null
+  raw?: any
   timestamp: string
   status: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'RECEIVED'
   senderUserId?: string | null

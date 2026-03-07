@@ -31,6 +31,43 @@ export default function ChatMessages() {
     lastConversationRef.current = activeConversationId
   }, [activeConversationId, isLoadingMessages, messages.length])
 
+  useEffect(() => {
+    if (!previewImage) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPreviewImage(null)
+        return
+      }
+
+      if (!(event.ctrlKey || event.metaKey)) return
+
+      if (event.key === '+' || event.key === '=' || event.key === 'Add') {
+        event.preventDefault()
+        setPreviewZoom((current) => Math.min(4, Number((current + 0.2).toFixed(2))))
+      }
+
+      if (event.key === '-' || event.key === 'Subtract') {
+        event.preventDefault()
+        setPreviewZoom((current) => Math.max(0.6, Number((current - 0.2).toFixed(2))))
+      }
+
+      if (event.key === '0') {
+        event.preventDefault()
+        setPreviewZoom(1)
+      }
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [previewImage])
+
   if (!activeConversationId) {
     return (
       <div className="flex-1 flex items-center justify-center opacity-30 text-sm">
@@ -56,7 +93,7 @@ export default function ChatMessages() {
         className="messages flex-1 overflow-x-hidden overflow-y-auto flex p-6 items-start flex-col gap-3"
       >
         {groupedMessages.map(({ label, msgs }) => (
-          <div key={label} className="w-full flex flex-col gap-3">
+          <div key={label} className="w-full flex flex-col gap-6">
             <span className="py-1 px-4 self-center bg-card rounded-full text-xs font-semibold">
               {label}
             </span>
@@ -93,7 +130,7 @@ export default function ChatMessages() {
               }
 
               return (
-                <div key={msg.id} className="message-card flex items-end gap-2 max-w-[60%]">
+                <div key={msg.id} className="message-card flex items-start gap-2 max-w-[60%]">
                   <UserProfile username={msg.remoteJid.split('@')[0]} avatarUrl={avatarUrl} />
                   <div className="message min-w-0 flex flex-col gap-1.5">
                     <div className={getBubbleClassName(msg, false)}>
@@ -115,45 +152,39 @@ export default function ChatMessages() {
       </div>
 
       {previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-6">
-          <div className="absolute right-6 top-6 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPreviewZoom((current) => Math.max(1, current - 0.25))}
-              className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-sm"
-            >
-              -
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreviewZoom(1)}
-              className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-sm"
-            >
-              100%
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreviewZoom((current) => Math.min(3, current + 0.25))}
-              className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-sm"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreviewImage(null)}
-              className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm"
-            >
-              Fechar
-            </button>
-          </div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 p-6 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewImage(null)}
+            className="absolute right-6 top-6 rounded-full border border-white/10 bg-white/8 px-4 py-2 text-sm text-white/80 transition hover:bg-white/12"
+          >
+            Fechar
+          </button>
 
-          <div className="max-h-full max-w-full overflow-auto">
+          <div
+            className="max-h-full max-w-full overflow-auto"
+            onClick={(event) => event.stopPropagation()}
+          >
             <img
               src={previewImage.src}
               alt={previewImage.alt}
-              className="max-h-[88vh] max-w-[88vw] origin-center object-contain transition-transform duration-150"
+              className="max-h-[84vh] max-w-[min(92vw,1080px)] origin-center rounded-2xl object-contain shadow-[0_25px_80px_rgba(0,0,0,0.45)] transition-transform duration-150"
               style={{ transform: `scale(${previewZoom})` }}
+              onDoubleClick={() => {
+                setPreviewZoom((current) => (current > 1 ? 1 : 2))
+              }}
             />
+          </div>
+
+          <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black/45 px-4 py-2 text-xs text-white/70 backdrop-blur">
+            <span>{Math.round(previewZoom * 100)}%</span>
+            <span className="h-1 w-1 rounded-full bg-white/25" />
+            <span>Ctrl +/- para zoom</span>
+            <span className="h-1 w-1 rounded-full bg-white/25" />
+            <span>Duplo clique para alternar</span>
           </div>
         </div>
       )}
@@ -181,7 +212,7 @@ function MessageContent({
           <img
             src={mediaUrl}
             alt={message.body ?? 'Imagem enviada'}
-            className="max-h-[220px] w-full rounded-xl object-cover transition hover:scale-[1.01]"
+            className="max-h-[180px] max-w-[280px] rounded-xl object-cover transition hover:scale-[1.01]"
           />
         </button>
         {message.body && <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>}
@@ -201,7 +232,7 @@ function MessageContent({
 
   if (message.type === 'audio' && mediaUrl) {
     return (
-      <div className="space-y-2 min-w-[260px]">
+      <div className="space-y-2 min-w-[220px]">
         <ChatAudioPlayer src={mediaUrl} mimeType={message.mediaMimeType} label="Audio" variant="bubble" />
         {message.body && <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>}
       </div>
@@ -241,8 +272,10 @@ function MessageContent({
 }
 
 function getBubbleClassName(message: WhatsAppMessage, fromMe: boolean) {
-  const isSticker = message.type === 'sticker' && !!message.mediaUrl
-  if (isSticker) return 'overflow-visible bg-transparent p-0'
+  const hasStandaloneMediaBody =
+    (message.type === 'sticker' || message.type === 'audio') && !!message.mediaUrl
+
+  if (hasStandaloneMediaBody) return 'overflow-visible bg-transparent p-0'
 
   return fromMe
     ? 'rounded-md rounded-tr-none bg-primary p-4 overflow-hidden'

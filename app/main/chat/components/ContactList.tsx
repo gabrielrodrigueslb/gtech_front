@@ -1,10 +1,91 @@
 'use client'
 import { useWhatsApp } from '@/context/Whatsappcontext'
+import { useMemo } from 'react'
 import ContactCard from './ContactCard'
+import {
+  FileAudio,
+  FileImage,
+  FileText,
+  MessageCircleCode,
+  Sticker,
+  Video,
+} from 'lucide-react'
+import type { WhatsAppConversation } from '@/types/Whatsapp.types'
 
-export default function ContactList() {
-  const { conversations, isLoadingConversations, activeConversationId, setActiveConversation } =
+type ContactListProps = {
+  filter: 'mine' | 'unassigned'
+  searchQuery?: string
+}
+
+function normalizeSearchValue(value?: string | null) {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function extractDigits(value?: string | null) {
+  return (value ?? '').replace(/\D/g, '')
+}
+
+export default function ContactList({ filter, searchQuery = '' }: ContactListProps) {
+  const {
+    conversations,
+    isLoadingConversations,
+    activeConversationId,
+    setActiveConversation,
+    currentUserId,
+  } =
     useWhatsApp()
+
+  const normalizedSearchQuery = normalizeSearchValue(searchQuery)
+  const searchDigits = extractDigits(searchQuery)
+
+  const filteredConversations = useMemo(
+    () =>
+      conversations.filter((conversation) => {
+        const matchesQueue =
+          filter === 'unassigned'
+            ? !conversation.assignedUserId
+            : conversation.assignedUserId === currentUserId
+
+        if (!matchesQueue) return false
+        if (!normalizedSearchQuery && !searchDigits) return true
+
+        const searchableText = [
+          conversation.contact?.name,
+          conversation.contact?.email,
+          conversation.contact?.phone,
+          conversation.pushName,
+          conversation.waName,
+          conversation.phone,
+          conversation.remoteJid.split('@')[0],
+          conversation.lastMessagePreview,
+        ]
+          .map((value) => normalizeSearchValue(value))
+          .filter(Boolean)
+
+        const searchableDigits = [
+          conversation.contact?.phone,
+          conversation.phone,
+          conversation.remoteJid.split('@')[0],
+        ]
+          .map((value) => extractDigits(value))
+          .filter(Boolean)
+
+        const matchesText = normalizedSearchQuery
+          ? searchableText.some((value) => value.includes(normalizedSearchQuery))
+          : false
+
+        const matchesDigits = searchDigits
+          ? searchableDigits.some((value) => value.includes(searchDigits))
+          : false
+
+        return matchesText || matchesDigits
+      }),
+    [conversations, currentUserId, filter, normalizedSearchQuery, searchDigits]
+  )
 
   if (isLoadingConversations) {
     return (
@@ -22,31 +103,43 @@ export default function ContactList() {
     )
   }
 
-  if (conversations.length === 0) {
+  if (filteredConversations.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm opacity-40 p-6 text-center">
-        Nenhum atendimento ativo
+        {searchQuery.trim()
+          ? 'Nenhum atendimento encontrado para essa busca'
+          : filter === 'unassigned'
+            ? 'Nenhum atendimento aguardando atribuicao'
+            : 'Nenhum atendimento atribuido a voce'}
       </div>
     )
   }
 
   return (
     <ul className="flex-col flex w-full h-full overflow-y-auto">
-      {conversations.map((conv) => (
-        <ContactCard
-          key={conv.id}
-          conversationId={conv.id}
-          lastMessage={conv.lastMessagePreview ?? ''}
-          nomeContato={conv.contact?.name ?? conv.pushName ?? conv.phone ?? 'Desconhecido'}
-          hora={conv.lastMessageAt ? formatHora(conv.lastMessageAt) : ''}
-          online={false}
-          isActive={conv.id === activeConversationId}
-          noRead={conv.unreadCount > 0}
-          unreadCount={conv.unreadCount}
-          status={conv.status}
-          onClick={() => setActiveConversation(conv.id)}
-        />
-      ))}
+      {filteredConversations.map((conv) => {
+        const preview = buildMessagePreview(conv)
+
+        return (
+          <ContactCard
+            key={conv.id}
+            conversationId={conv.id}
+            lastMessage={preview.text}
+            lastMessageIcon={preview.icon}
+            isPreviewHighlight={preview.highlight}
+            nomeContato={conv.contact?.name ?? conv.pushName ?? conv.phone ?? 'Desconhecido'}
+            hora={conv.lastMessageAt ? formatHora(conv.lastMessageAt) : ''}
+            online={false}
+            isActive={conv.id === activeConversationId}
+            noRead={conv.unreadCount > 0}
+            unreadCount={conv.unreadCount}
+            status={conv.status}
+            onClick={() => {
+              void setActiveConversation(conv.id)
+            }}
+          />
+        )
+      })}
     </ul>
   )
 }
@@ -60,4 +153,45 @@ function formatHora(dateStr: string) {
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
+
+function formatDuration(totalSeconds?: number | null) {
+  if (!totalSeconds || totalSeconds < 1) return '00:00'
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = Math.floor(totalSeconds % 60)
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function buildMessagePreview(conversation: WhatsAppConversation) {
+  const preview = conversation.lastMessagePreview ?? ''
+
+  if (conversation.lastMessageType === 'audio') {
+    return {
+      text: `Audio ${formatDuration(conversation.lastMessageDurationSeconds)}`,
+      icon: <FileAudio size={14} />,
+      highlight: false,
+    }
+  }
+
+  if (conversation.lastMessageType === 'image') {
+    return { text: 'Imagem', icon: <FileImage size={14} />, highlight: false }
+  }
+
+  if (conversation.lastMessageType === 'sticker') {
+    return { text: 'Figurinha', icon: <Sticker size={14} />, highlight: false }
+  }
+
+  if (conversation.lastMessageType === 'document') {
+    return { text: preview || 'Arquivo', icon: <FileText size={14} />, highlight: false }
+  }
+
+  if (conversation.lastMessageType === 'video') {
+    return { text: 'Video', icon: <Video size={14} />, highlight: false }
+  }
+
+  if (conversation.lastMessageType === 'reaction') {
+    return { text: preview || 'Reacao', icon: <MessageCircleCode size={14} />, highlight: false }
+  }
+
+  return { text: preview, icon: null, highlight: false }
 }

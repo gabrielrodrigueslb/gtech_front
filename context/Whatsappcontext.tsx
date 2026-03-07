@@ -5,16 +5,28 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
 import { io, Socket } from 'socket.io-client'
+import { getUsers, getMe } from '@/lib/auth'
 import {
-  getConversations,
-  markConversationAsRead,
+  assignConversation as assignConversationApi,
   closeConversation as closeConversationApi,
+  getConversations,
+  getMessages,
+  markConversationAsRead,
+  saveConversationContact as saveConversationContactApi,
+  type SaveConversationContactInput,
 } from '@/lib/Whatsapp'
-import type { WhatsAppConversation, WhatsAppMessage } from '@/types/Whatsapp.types'
+import type {
+  ConversationPresence,
+  CRMContact,
+  OnlineAgent,
+  WhatsAppConversation,
+  WhatsAppMessage,
+} from '@/types/Whatsapp.types'
 
 interface MessagesByConversation {
   [conversationId: string]: WhatsAppMessage[]
@@ -24,13 +36,22 @@ interface WhatsAppContextValue {
   conversations: WhatsAppConversation[]
   isLoadingConversations: boolean
   activeConversationId: string | null
-  setActiveConversation: (id: string) => void
+  setActiveConversation: (id: string) => Promise<void>
   activeConversation: WhatsAppConversation | null
+  activePresence: ConversationPresence | null
+  getPresenceForConversation: (conversationId?: string | null) => ConversationPresence | null
   messages: WhatsAppMessage[]
   isLoadingMessages: boolean
   closeConversation: (id: string, reason: string) => Promise<void>
   addOutgoingMessage: (msg: WhatsAppMessage) => void
   registerConversation: (conversation: WhatsAppConversation) => void
+  assignConversation: (id: string, userId: string) => Promise<WhatsAppConversation>
+  saveConversationContact: (
+    id: string,
+    payload: SaveConversationContactInput
+  ) => Promise<{ conversation: WhatsAppConversation; contact: CRMContact }>
+  agents: OnlineAgent[]
+  currentUserId: string | null
   isConnected: boolean
 }
 
@@ -87,30 +108,81 @@ function upsertConversationInList(
   )
 }
 
+function shouldShowConversationForUser(
+  conversation: WhatsAppConversation,
+  currentUserId: string | null
+) {
+  if (!isConversationVisible(conversation)) return false
+  if (!currentUserId) return true
+  return !conversation.assignedUserId || conversation.assignedUserId === currentUserId
+}
+
+function extractAudioDurationFromMessage(message?: WhatsAppMessage | null) {
+  return (
+    message?.raw?.message?.audioMessage?.seconds ??
+    message?.raw?.audioMessage?.seconds ??
+    null
+  )
+}
+
+function getPreviewTextForMessage(message: WhatsAppMessage) {
+  if (message.body?.trim()) return message.body.trim()
+  if (message.type === 'image') return '[Imagem]'
+  if (message.type === 'audio') return '[Audio]'
+  if (message.type === 'video') return '[Video]'
+  if (message.type === 'document') return '[Arquivo]'
+  if (message.type === 'sticker') return '[Figurinha]'
+  if (message.type === 'reaction') return '[Reacao]'
+  return '[Mensagem]'
+}
+
 export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
-  const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
+  const [allConversations, setAllConversations] = useState<WhatsAppConversation[]>([])
   const [isLoadingConversations, setIsLoadingConversations] = useState(true)
   const [messagesByConversation, setMessagesByConversation] = useState<MessagesByConversation>({})
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [agents, setAgents] = useState<OnlineAgent[]>([])
+  const [presenceByRemoteJid, setPresenceByRemoteJid] = useState<Record<string, ConversationPresence>>({})
 
   const socketRef = useRef<Socket | null>(null)
   const previousConversationRef = useRef<string | null>(null)
 
   useEffect(() => {
-    async function loadConversations() {
+    let isMounted = true
+
+    async function bootstrap() {
       try {
-        const result = await getConversations({ limit: 50 })
-        setConversations(sortConversations(result.data.filter(isConversationVisible)))
+        const [me, users, result] = await Promise.all([
+          getMe(),
+          getUsers().catch(() => []),
+          getConversations({ limit: 50 }),
+        ])
+
+        if (!isMounted) return
+
+        setCurrentUserId(me?.id ?? null)
+        setAgents((prev) =>
+          users.map((user) => ({
+            ...user,
+            isOnline: prev.find((agent) => agent.id === user.id)?.isOnline ?? false,
+          }))
+        )
+        setAllConversations(sortConversations(result.data.filter(isConversationVisible)))
       } catch (err) {
-        console.error('[WhatsApp] Erro ao carregar conversas:', err)
+        console.error('[WhatsApp] Erro ao carregar contexto inicial:', err)
       } finally {
-        setIsLoadingConversations(false)
+        if (isMounted) setIsLoadingConversations(false)
       }
     }
 
-    loadConversations()
+    bootstrap()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   useEffect(() => {
@@ -131,6 +203,23 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       console.log('[Socket] Desconectado')
     })
 
+    socket.on('agents:online', ({ userIds }: { userIds: string[] }) => {
+      setAgents((prev) =>
+        prev.map((agent) => ({
+          ...agent,
+          isOnline: userIds.includes(agent.id),
+        }))
+      )
+    })
+
+    socket.on('whatsapp:presence', (presence: ConversationPresence) => {
+      if (!presence?.remoteJid) return
+      setPresenceByRemoteJid((prev) => ({
+        ...prev,
+        [presence.remoteJid]: presence,
+      }))
+    })
+
     socket.on('whatsapp:new-message', (payload: {
       message: WhatsAppMessage
       conversationId: string
@@ -143,31 +232,41 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
         [conversationId]: appendUniqueMessage(prev[conversationId] ?? [], message),
       }))
 
-      setConversations((prev) =>
+      setAllConversations((prev) =>
         sortConversations(
           prev.map((conversationItem) =>
             conversationItem.id === conversationId
               ? {
                   ...conversationItem,
                   lastMessagePreview:
-                    conversation?.lastMessagePreview ?? message.body ?? conversationItem.lastMessagePreview,
+                    conversation?.lastMessagePreview ??
+                    getPreviewTextForMessage(message) ??
+                    conversationItem.lastMessagePreview,
                   lastMessageAt:
                     conversation?.lastMessageAt ?? message.timestamp ?? conversationItem.lastMessageAt,
                   unreadCount: conversation?.unreadCount ?? conversationItem.unreadCount,
+                  assignedUserId: conversation?.assignedUserId ?? conversationItem.assignedUserId,
+                  assignedUser: conversation?.assignedUser ?? conversationItem.assignedUser,
+                  lastMessageType: conversation?.lastMessageType ?? message.type ?? conversationItem.lastMessageType,
+                  lastMessageDurationSeconds:
+                    conversation?.lastMessageDurationSeconds ??
+                    (message.type === 'audio'
+                      ? extractAudioDurationFromMessage(message)
+                      : conversationItem.lastMessageDurationSeconds),
                 }
               : conversationItem
           )
         )
       )
 
-      setConversations((prev) => {
+      setAllConversations((prev) => {
         if (!conversation) return prev
         return upsertConversationInList(prev, conversation)
       })
     })
 
     socket.on('whatsapp:conversation-upserted', ({ conversation }: { conversation: WhatsAppConversation }) => {
-      setConversations((prev) => upsertConversationInList(prev, conversation))
+      setAllConversations((prev) => upsertConversationInList(prev, conversation))
     })
 
     socket.on('whatsapp:message-status', ({ messageId, status }: { messageId: string; status: string }) => {
@@ -185,7 +284,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     })
 
     socket.on('whatsapp:conversation-closed', ({ conversationId }: { conversationId: string }) => {
-      setConversations((prev) => prev.filter((conversation) => conversation.id !== conversationId))
+      setAllConversations((prev) => prev.filter((conversation) => conversation.id !== conversationId))
       setMessagesByConversation((prev) => {
         const updated = { ...prev }
         delete updated[conversationId]
@@ -202,10 +301,61 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  useEffect(() => {
+    if (!socketRef.current || !currentUserId) return
+    if (!socketRef.current.connected) return
+    socketRef.current.emit('auth:register', currentUserId)
+  }, [currentUserId, isConnected])
+
+  const conversations = useMemo(
+    () =>
+      allConversations.filter((conversation) =>
+        shouldShowConversationForUser(conversation, currentUserId)
+      ),
+    [allConversations, currentUserId]
+  )
+
+  useEffect(() => {
+    if (!socketRef.current || !socketRef.current.connected || conversations.length === 0) return
+    socketRef.current.emit(
+      'watch:conversations',
+      conversations
+        .filter((conversation) => conversation.chatType === 'individual')
+        .map((conversation) => conversation.id)
+    )
+  }, [conversations, isConnected])
+
+  useEffect(() => {
+    if (!activeConversationId) return
+    const stillVisible = conversations.some((conversation) => conversation.id === activeConversationId)
+    if (!stillVisible) {
+      if (previousConversationRef.current) {
+        socketRef.current?.emit('leave:conversation', previousConversationRef.current)
+        previousConversationRef.current = null
+      }
+      setActiveConversationId(null)
+    }
+  }, [activeConversationId, conversations])
+
+  const assignConversation = useCallback(async (id: string, userId: string) => {
+    const conversation = await assignConversationApi(id, userId)
+    setAllConversations((prev) => upsertConversationInList(prev, conversation))
+    return conversation
+  }, [])
+
   const setActiveConversation = useCallback(
     async (id: string) => {
       if (previousConversationRef.current) {
         socketRef.current?.emit('leave:conversation', previousConversationRef.current)
+      }
+
+      const selectedConversation = allConversations.find((conversation) => conversation.id === id)
+      if (selectedConversation && !selectedConversation.assignedUserId && currentUserId) {
+        try {
+          await assignConversation(id, currentUserId)
+        } catch (error) {
+          console.error('[WhatsApp] Erro ao assumir atendimento:', error)
+        }
       }
 
       setActiveConversationId(id)
@@ -213,7 +363,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
 
       socketRef.current?.emit('join:conversation', id)
 
-      setConversations((prev) =>
+      setAllConversations((prev) =>
         prev.map((conversation) => (conversation.id === id ? { ...conversation, unreadCount: 0 } : conversation))
       )
       markConversationAsRead(id).catch(() => {})
@@ -222,7 +372,6 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
 
       setIsLoadingMessages(true)
       try {
-        const { getMessages } = await import('@/lib/Whatsapp')
         const messages = await getMessages(id, { limit: 50 })
         setMessagesByConversation((prev) => ({ ...prev, [id]: dedupeMessages(messages) }))
       } catch (err) {
@@ -231,12 +380,12 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingMessages(false)
       }
     },
-    [messagesByConversation]
+    [allConversations, assignConversation, currentUserId, messagesByConversation]
   )
 
   const closeConversation = useCallback(async (id: string, reason: string) => {
     await closeConversationApi(id, reason)
-    setConversations((prev) => prev.filter((conversation) => conversation.id !== id))
+    setAllConversations((prev) => prev.filter((conversation) => conversation.id !== id))
     setMessagesByConversation((prev) => {
       const updated = { ...prev }
       delete updated[id]
@@ -248,32 +397,67 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const addOutgoingMessage = useCallback((msg: WhatsAppMessage) => {
-    setMessagesByConversation((prev) => ({
-      ...prev,
-      [msg.conversationId]: appendUniqueMessage(prev[msg.conversationId] ?? [], msg),
-    }))
-    setConversations((prev) =>
-      sortConversations(
-        prev.map((conversation) =>
-          conversation.id === msg.conversationId
-            ? {
-                ...conversation,
-                lastMessagePreview: msg.body ?? conversation.lastMessagePreview,
-                lastMessageAt: msg.timestamp,
-              }
-            : conversation
+  const addOutgoingMessage = useCallback(
+    (msg: WhatsAppMessage) => {
+      setMessagesByConversation((prev) => ({
+        ...prev,
+        [msg.conversationId]: appendUniqueMessage(prev[msg.conversationId] ?? [], msg),
+      }))
+      setAllConversations((prev) =>
+        sortConversations(
+          prev.map((conversation) =>
+            conversation.id === msg.conversationId
+              ? {
+                  ...conversation,
+                  lastMessagePreview: getPreviewTextForMessage(msg),
+                  lastMessageAt: msg.timestamp,
+                  assignedUserId: conversation.assignedUserId ?? currentUserId,
+                  lastMessageType: msg.type,
+                  lastMessageDurationSeconds:
+                    msg.type === 'audio' ? extractAudioDurationFromMessage(msg) : null,
+                }
+              : conversation
+          )
         )
       )
-    )
-  }, [])
+    },
+    [currentUserId]
+  )
 
   const registerConversation = useCallback((conversation: WhatsAppConversation) => {
-    setConversations((prev) => upsertConversationInList(prev, conversation))
+    setAllConversations((prev) => upsertConversationInList(prev, conversation))
   }, [])
 
-  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null
+  const saveConversationContact = useCallback(
+    async (id: string, payload: SaveConversationContactInput) => {
+      const response = await saveConversationContactApi(id, payload)
+      setAllConversations((prev) =>
+        upsertConversationInList(prev, {
+          ...response.conversation,
+          contact: response.contact,
+          contactId: response.contact.id,
+        })
+      )
+      return response
+    },
+    []
+  )
+
+  const activeConversation =
+    conversations.find((conversation) => conversation.id === activeConversationId) ?? null
   const messages = activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : []
+
+  const getPresenceForConversation = useCallback(
+    (conversationId?: string | null) => {
+      if (!conversationId) return null
+      const conversation = allConversations.find((item) => item.id === conversationId)
+      if (!conversation?.remoteJid) return null
+      return presenceByRemoteJid[conversation.remoteJid] ?? null
+    },
+    [allConversations, presenceByRemoteJid]
+  )
+
+  const activePresence = getPresenceForConversation(activeConversationId)
 
   return (
     <WhatsAppContext.Provider
@@ -283,11 +467,17 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
         activeConversationId,
         setActiveConversation,
         activeConversation,
+        activePresence,
+        getPresenceForConversation,
         messages,
         isLoadingMessages,
         closeConversation,
         addOutgoingMessage,
         registerConversation,
+        assignConversation,
+        saveConversationContact,
+        agents,
+        currentUserId,
         isConnected,
       }}
     >

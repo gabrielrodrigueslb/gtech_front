@@ -13,7 +13,11 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useWhatsApp } from '@/context/Whatsappcontext'
-import { sendMediaMessage, sendMessage } from '@/lib/Whatsapp'
+import {
+  normalizeWhatsAppMediaMimeType,
+  sendMediaMessage,
+  sendMessage,
+} from '@/lib/Whatsapp'
 import { getMe } from '@/lib/auth'
 import AudioBars from './AudioBars'
 import ChatAudioPlayer from './ChatAudioPlayer'
@@ -47,7 +51,15 @@ export default function ChatFooter() {
 
   const hasText = text.trim().length > 0
   const isBusy = isSending || isUploadingMedia
+  const hasRecordedAudio = !!recordedAudioBlob && !!recordedAudioUrl
+  const isComposerLocked = isRecording || hasRecordedAudio
   const isInputDisabled = !activeConversationId || isBusy || !currentUserId || isRecording
+
+  function formatDuration(totalSeconds: number) {
+    return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(
+      totalSeconds % 60
+    ).padStart(2, '0')}`
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -97,7 +109,7 @@ export default function ChatFooter() {
     setRecordingDuration(0)
   }
 
-  function clearRecordedAudio() {
+  function clearRecordedAudio(shouldFocusInput = true) {
     discardRecordingRef.current = true
     recordingChunksRef.current = []
 
@@ -112,6 +124,9 @@ export default function ChatFooter() {
     if (recordedAudioUrl) URL.revokeObjectURL(recordedAudioUrl)
     setRecordedAudioBlob(null)
     setRecordedAudioUrl(null)
+    if (shouldFocusInput) {
+      window.setTimeout(() => inputRef.current?.focus(), 0)
+    }
   }
 
   async function handleSend() {
@@ -167,59 +182,38 @@ export default function ChatFooter() {
     })
   }
 
-  async function blobToArrayBuffer(blob: Blob) {
-    return await blob.arrayBuffer()
-  }
+  async function getAudioDurationSeconds(file: Blob) {
+    if (!file.type.startsWith('audio/')) return undefined
 
-  function encodeWav(audioBuffer: AudioBuffer) {
-    const numberOfChannels = audioBuffer.numberOfChannels
-    const sampleRate = audioBuffer.sampleRate
-    const format = 1
-    const bitDepth = 16
-    const samples = audioBuffer.length
-    const blockAlign = numberOfChannels * (bitDepth / 8)
-    const buffer = new ArrayBuffer(44 + samples * blockAlign)
-    const view = new DataView(buffer)
+    return new Promise<number | undefined>((resolve) => {
+      const objectUrl = URL.createObjectURL(file)
+      const audio = document.createElement('audio')
 
-    function writeString(offset: number, value: string) {
-      for (let i = 0; i < value.length; i += 1) {
-        view.setUint8(offset + i, value.charCodeAt(i))
+      const cleanup = () => {
+        audio.src = ''
+        audio.load()
+        URL.revokeObjectURL(objectUrl)
       }
-    }
 
-    writeString(0, 'RIFF')
-    view.setUint32(4, 36 + samples * blockAlign, true)
-    writeString(8, 'WAVE')
-    writeString(12, 'fmt ')
-    view.setUint32(16, 16, true)
-    view.setUint16(20, format, true)
-    view.setUint16(22, numberOfChannels, true)
-    view.setUint32(24, sampleRate, true)
-    view.setUint32(28, sampleRate * blockAlign, true)
-    view.setUint16(32, blockAlign, true)
-    view.setUint16(34, bitDepth, true)
-    writeString(36, 'data')
-    view.setUint32(40, samples * blockAlign, true)
-
-    const channelData = Array.from({ length: numberOfChannels }, (_, channel) =>
-      audioBuffer.getChannelData(channel)
-    )
-
-    let offset = 44
-    for (let i = 0; i < samples; i += 1) {
-      for (let channel = 0; channel < numberOfChannels; channel += 1) {
-        const sample = Math.max(-1, Math.min(1, channelData[channel][i]))
-        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
-        offset += 2
+      audio.preload = 'metadata'
+      audio.onloadedmetadata = () => {
+        const duration = Number.isFinite(audio.duration)
+          ? Math.max(1, Math.round(audio.duration))
+          : undefined
+        cleanup()
+        resolve(duration)
       }
-    }
-
-    return new Blob([buffer], { type: 'audio/wav' })
+      audio.onerror = () => {
+        cleanup()
+        resolve(undefined)
+      }
+      audio.src = objectUrl
+    })
   }
 
   async function prepareRecordedAudioForSending(blob: Blob) {
     const mimeType = blob.type || 'audio/webm'
-    if (mimeType.includes('ogg') || mimeType.includes('opus')) {
+    if (mimeType.startsWith('audio/ogg')) {
       return {
         file: new File([blob], `gravacao-${Date.now()}.ogg`, {
           type: mimeType,
@@ -228,37 +222,34 @@ export default function ChatFooter() {
       }
     }
 
-    const audioContext = new window.AudioContext()
-    try {
-      const arrayBuffer = await blobToArrayBuffer(blob)
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0))
-      const wavBlob = encodeWav(audioBuffer)
+    if (mimeType.startsWith('audio/mp4') || mimeType.includes('aac') || mimeType.includes('m4a')) {
       return {
-        file: new File([wavBlob], `gravacao-${Date.now()}.wav`, {
-          type: 'audio/wav',
-        }),
-        ptt: false,
-      }
-    } catch (error) {
-      return {
-        file: new File([blob], `gravacao-${Date.now()}.webm`, {
+        file: new File([blob], `gravacao-${Date.now()}.m4a`, {
           type: mimeType,
         }),
-        ptt: false,
+        ptt: true,
       }
-    } finally {
-      await audioContext.close().catch(() => {})
+    }
+
+    return {
+      file: new File([blob], `gravacao-${Date.now()}.webm`, {
+        type: mimeType,
+      }),
+      ptt: true,
     }
   }
 
   async function handleSelectedFile(file: File, forcedType?: 'image' | 'audio' | 'document') {
     const mediaDataUrl = await fileToDataUrl(file)
+    const normalizedMimeType = normalizeWhatsAppMediaMimeType(file.type, forcedType)
+    const seconds = forcedType === 'audio' ? await getAudioDurationSeconds(file) : undefined
 
     await handleSendMedia({
       mediaDataUrl,
-      mimeType: file.type,
+      mimeType: normalizedMimeType,
       fileName: file.name,
       type: forcedType,
+      seconds,
     })
   }
 
@@ -287,7 +278,7 @@ export default function ChatFooter() {
     if (!activeConversationId || !currentUserId || isBusy) return
 
     try {
-      clearRecordedAudio()
+      clearRecordedAudio(false)
       discardRecordingRef.current = false
       setMediaError(null)
 
@@ -302,8 +293,14 @@ export default function ChatFooter() {
       analyserRef.current = analyser
 
       const preferredMimeType =
-        MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
+        MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+          ? 'audio/ogg;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')
+            ? 'audio/mp4;codecs=mp4a.40.2'
+          : MediaRecorder.isTypeSupported('audio/mp4')
+            ? 'audio/mp4'
+          : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
           : MediaRecorder.isTypeSupported('audio/webm')
             ? 'audio/webm'
             : ''
@@ -376,12 +373,11 @@ export default function ChatFooter() {
     if (!recordedAudioBlob) return
 
     const { file, ptt } = await prepareRecordedAudioForSending(recordedAudioBlob)
-
     const mediaDataUrl = await fileToDataUrl(file)
 
     await handleSendMedia({
       mediaDataUrl,
-      mimeType: file.type,
+      mimeType: normalizeWhatsAppMediaMimeType(file.type, 'audio'),
       fileName: file.name,
       type: 'audio',
       ptt,
@@ -405,73 +401,28 @@ export default function ChatFooter() {
   }
 
   return (
-    <footer className="w-full bg-card flex flex-col px-3 py-2 gap-3">
-      {recordedAudioUrl && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-          <p className="text-sm font-medium">Audio gravado</p>
-          <ChatAudioPlayer
-            src={recordedAudioUrl}
-            mimeType={recordedAudioBlob?.type || 'audio/webm'}
-            label="Previa da gravacao"
-            variant="panel"
-          />
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={clearRecordedAudio}
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/5"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleSendRecordedAudio}
-              disabled={isUploadingMedia}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium transition hover:opacity-90 disabled:opacity-50"
-            >
-              {isUploadingMedia ? 'Enviando...' : 'Enviar audio'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {isRecording && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Gravando audio</p>
-              <p className="text-xs text-white/55">
-                {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:
-                {String(recordingDuration % 60).padStart(2, '0')}
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 px-3 py-1 text-xs font-medium text-primary">
-              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-              Capturando
-            </span>
-          </div>
-
-          <AudioBars progress={recordingLevel} liveLevel={recordingLevel} isActive className="mt-1" />
-        </div>
-      )}
-
+    <footer className="flex w-full flex-col gap-3 bg-card px-3 py-2">
       {mediaError && (
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
           {mediaError}
         </div>
       )}
 
-      <div className="w-full flex gap-4 items-center">
-        <div className="relative flex gap-2">
+      <div className="flex w-full items-center gap-3">
+        <div className="relative flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => setIsAttachmentMenuOpen((current) => !current)}
-            disabled={!activeConversationId || isBusy}
+            disabled={!activeConversationId || isBusy || isComposerLocked}
             className="p-1 rounded-sm transition-all cursor-pointer hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus />
           </button>
-          <button className="p-1 rounded-sm transition-all cursor-pointer hover:bg-white/20">
+          <button
+            type="button"
+            disabled={!activeConversationId || isComposerLocked}
+            className="cursor-pointer rounded-sm p-1 transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
             <SmilePlus />
           </button>
 
@@ -502,49 +453,117 @@ export default function ChatFooter() {
           )}
         </div>
 
-        <input
-          ref={inputRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          type="text"
-          disabled={isInputDisabled}
-          className="bg-white/5 rounded-md flex-1 px-6 py-4 text-sm border focus:outline-none disabled:opacity-40"
-          placeholder={
-            isRecording
-              ? 'Gravando audio... clique no botao para finalizar'
-              : !activeConversationId
-                ? 'Selecione uma conversa'
-                : !currentUserId
-                  ? 'Carregando usuario...'
-                  : 'Escreva sua mensagem'
-          }
-        />
-
-        <button
-          type="button"
-          onClick={handlePrimaryAction}
-          disabled={!activeConversationId || isBusy || !currentUserId || !!recordedAudioBlob}
-          className="p-1 size-12 flex items-center justify-center rounded-full transition-all cursor-pointer hover:bg-white/20 bg-primary disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {hasText ? (
-            <SendHorizontal />
-          ) : isRecording ? (
-            <Square />
+        <div className="flex min-w-0 flex-1 items-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+          {isRecording ? (
+            <div className="flex w-full items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <Mic size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">Gravando audio</p>
+                    <p className="text-xs text-white/55">{formatDuration(recordingDuration)}</p>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-primary/30 px-3 py-1 text-[11px] font-medium text-primary">
+                    <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    Capturando
+                  </span>
+                </div>
+                <AudioBars
+                  progress={recordingLevel}
+                  liveLevel={recordingLevel}
+                  isActive
+                  className="mt-2"
+                />
+              </div>
+            </div>
+          ) : hasRecordedAudio ? (
+            <div className="w-full min-w-0">
+              <ChatAudioPlayer
+                src={recordedAudioUrl!}
+                mimeType={recordedAudioBlob?.type || 'audio/webm'}
+                label="Previa do audio"
+                variant="inline"
+              />
+            </div>
           ) : (
-            <Mic />
+            <input
+              ref={inputRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              type="text"
+              disabled={isInputDisabled}
+              className="h-12 w-full bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none disabled:opacity-40 flex-1"
+              placeholder={
+                !activeConversationId
+                  ? 'Selecione uma conversa'
+                  : !currentUserId
+                    ? 'Carregando usuario...'
+                    : 'Escreva sua mensagem'
+              }
+            />
           )}
-        </button>
+        </div>
 
-        {(isRecording || recordedAudioBlob) && (
-          <button
-            type="button"
-            onClick={clearRecordedAudio}
-            className="p-1 size-12 flex items-center justify-center rounded-full transition-all cursor-pointer hover:bg-white/20 border border-white/10"
-          >
-            <Trash2 size={18} />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center justify-end gap-2 ">
+          {isRecording ? (
+            <>
+              <button
+                type="button"
+                onClick={() => clearRecordedAudio()}
+                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/5 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
+                title="Cancelar gravacao"
+              >
+                <Trash2 size={18} />
+                <span className="hidden sm:inline">Cancelar</span>
+              </button>
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-white transition hover:opacity-90 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
+                title="Finalizar gravacao"
+              >
+                <Square size={18} />
+                <span className="hidden sm:inline">Finalizar</span>
+              </button>
+            </>
+          ) : hasRecordedAudio ? (
+            <>
+              <button
+                type="button"
+                onClick={() => clearRecordedAudio()}
+                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/5 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
+                title="Excluir audio"
+              >
+                <Trash2 size={18} />
+                <span className="hidden sm:inline">Excluir</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSendRecordedAudio}
+                disabled={isUploadingMedia}
+                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
+                title="Enviar audio"
+              >
+                <SendHorizontal size={18} />
+                <span className="hidden sm:inline">
+                  {isUploadingMedia ? 'Enviando...' : 'Enviar'}
+                </span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handlePrimaryAction}
+              disabled={!activeConversationId || isBusy || !currentUserId}
+              className="flex size-12 cursor-pointer items-center justify-center rounded-full bg-primary p-1 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {hasText ? <SendHorizontal /> : <Mic />}
+            </button>
+          )}
+        </div>
       </div>
 
       <input

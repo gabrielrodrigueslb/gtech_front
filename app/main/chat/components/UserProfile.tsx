@@ -33,9 +33,6 @@ export default function UserProfile({ online, avatarUrl, username }: UserProfile
       ) : (
         iniciaisContato
       )}
-      {online && (
-        <span className="size-4 block right-0 bottom-0 border-2 rounded-full bg-green-500 absolute animate-pulse animation-duration-1.7" />
-      )}
     </div>
   )
 }

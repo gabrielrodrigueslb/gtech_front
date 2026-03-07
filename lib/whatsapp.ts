@@ -1,6 +1,8 @@
 // frontend service -- nao confundir com o whatsapp.service.js do backend
 import { api } from './api'
 import type {
+  CRMContact,
+  ConversationPresence,
   ConversationsPage,
   WhatsAppConversation,
   WhatsAppMessage,
@@ -26,6 +28,18 @@ export type SendWhatsAppMediaInput = {
   type?: 'image' | 'audio' | 'document' | 'sticker' | 'video'
   caption?: string
   ptt?: boolean
+  seconds?: number
+}
+
+export type SaveConversationContactInput = {
+  name: string
+  email?: string
+  phone?: string
+  segment?: string
+  company?: string
+  status?: string
+  notes?: string
+  tags?: string[]
 }
 
 export const DEFAULT_WHATSAPP_CLOSE_REASONS = [
@@ -34,6 +48,8 @@ export const DEFAULT_WHATSAPP_CLOSE_REASONS = [
   'Solicitacao resolvida em outro canal',
   'Atendimento duplicado',
 ]
+
+export const DEFAULT_WHATSAPP_CONTACT_TAGS = ['VIP', 'Frequente', 'Suporte', 'Inbound']
 
 export async function getWhatsAppSession(): Promise<WhatsAppSession> {
   const { data } = await api.get('/whatsapp/session')
@@ -77,6 +93,13 @@ export async function getConversationProfile(
   return data
 }
 
+export async function getConversationPresence(
+  id: string
+): Promise<ConversationPresence | null> {
+  const { data } = await api.get(`/whatsapp/conversations/${id}/presence`)
+  return data
+}
+
 export async function getCloseReasons(): Promise<string[]> {
   const { data } = await api.get('/whatsapp/close-reasons')
   return data.data ?? []
@@ -89,6 +112,21 @@ export async function createCloseReason(reason: string): Promise<string[]> {
 
 export async function deleteCloseReason(reason: string): Promise<string[]> {
   const { data } = await api.delete('/whatsapp/close-reasons', { data: { reason } })
+  return data.data ?? []
+}
+
+export async function getContactTags(): Promise<string[]> {
+  const { data } = await api.get('/whatsapp/contact-tags')
+  return data.data ?? []
+}
+
+export async function createContactTag(tag: string): Promise<string[]> {
+  const { data } = await api.post('/whatsapp/contact-tags', { tag })
+  return data.data ?? []
+}
+
+export async function deleteContactTag(tag: string): Promise<string[]> {
+  const { data } = await api.delete('/whatsapp/contact-tags', { data: { tag } })
   return data.data ?? []
 }
 
@@ -105,6 +143,14 @@ export async function assignConversation(
   userId: string
 ): Promise<WhatsAppConversation> {
   const { data } = await api.post(`/whatsapp/conversations/${id}/assign`, { userId })
+  return data
+}
+
+export async function saveConversationContact(
+  id: string,
+  input: SaveConversationContactInput
+): Promise<{ conversation: WhatsAppConversation; contact: CRMContact }> {
+  const { data } = await api.post(`/whatsapp/conversations/${id}/contact`, input)
   return data
 }
 
@@ -138,6 +184,53 @@ export async function sendMediaMessage(
 ): Promise<WhatsAppMessage> {
   const { data } = await api.post(`/whatsapp/conversations/${conversationId}/messages`, input)
   return data
+}
+
+export function normalizeWhatsAppMediaMimeType(
+  mimeType?: string | null,
+  declaredType?: SendWhatsAppMediaInput['type']
+) {
+  const original = String(mimeType ?? '').trim().toLowerCase()
+  if (!original) return undefined
+
+  const baseMimeType = original.split(';')[0]?.trim()
+  if (!baseMimeType) return undefined
+
+  if (declaredType === 'audio' || baseMimeType.startsWith('audio/')) {
+    if (baseMimeType === 'audio/ogg' || baseMimeType === 'application/ogg') {
+      return 'audio/ogg'
+    }
+
+    if (
+      baseMimeType === 'audio/mp4' ||
+      baseMimeType === 'audio/m4a' ||
+      baseMimeType === 'audio/x-m4a'
+    ) {
+      return 'audio/mp4'
+    }
+
+    if (baseMimeType === 'audio/webm') {
+      return original.includes('opus') ? 'audio/webm; codecs=opus' : 'audio/webm'
+    }
+
+    if (baseMimeType === 'audio/mp3' || baseMimeType === 'audio/mpeg') {
+      return 'audio/mpeg'
+    }
+
+    if (
+      baseMimeType === 'audio/wav' ||
+      baseMimeType === 'audio/x-wav' ||
+      baseMimeType === 'audio/wave'
+    ) {
+      return 'audio/wav'
+    }
+
+    if (baseMimeType === 'audio/aac') {
+      return 'audio/aac'
+    }
+  }
+
+  return baseMimeType
 }
 
 export function resolveWhatsAppMediaUrl(mediaUrl?: string | null) {

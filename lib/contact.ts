@@ -3,19 +3,25 @@ import { api } from './api';
 export interface Contact {
   id: string;
   name: string;
-  email: string;
-  phone: string;
-  company: string;
+  email?: string | null;
+  phone?: string | null;
+  company?: string | null;
   segment?: string;
   status?: "lead" | "prospect" | "customer" | "inactive";
   createdAt?: string;
-  notes?: string;
+  notes?: string | null;
+  tags?: string[];
 }
 
 // Buscar todos os contatos
 export async function getContacts() {
   const { data } = await api.get('/contacts');
   return data;
+}
+
+export async function getContactById(id: string) {
+  const { data } = await api.get(`/contacts/${id}`);
+  return data as Contact;
 }
 
 // Criar contato

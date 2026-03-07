@@ -48,9 +48,9 @@ export default function NewConversationButton() {
       <button
         type="button"
         onClick={() => setIsModalOpen(true)}
-        className="bg-primary m-3 font-semibold flex gap-2 items-center justify-center py-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
+        className="bg-primary font-semibold flex gap-2 items-center justify-center  p-2.5 rounded-xl cursor-pointer hover:opacity-80 transition-opacity shrink-0"
       >
-        <CirclePlus /> Novo Atendimento
+        <CirclePlus size={20}/>
       </button>
 
       {isModalOpen && (
@@ -67,7 +67,7 @@ export default function NewConversationButton() {
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Telefone com DDD ou codigo do pais"
+                placeholder="Telefone com DDD ou codigo do pais (com ou sem 9)"
                 className="w-full rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none"
               />
 
@@ -98,7 +98,7 @@ export default function NewConversationButton() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-xl border border-white/10 px-4 py-3 text-sm transition hover:bg-white/5 disabled:opacity-50"
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm transition hover:bg-white/5 disabled:opacity-50 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -106,7 +106,7 @@ export default function NewConversationButton() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleSubmit}
-                className="rounded-xl bg-primary px-4 py-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-50"
+                className="rounded-xl bg-primary px-4 py-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? 'Abrindo...' : 'Abrir atendimento'}
               </button>

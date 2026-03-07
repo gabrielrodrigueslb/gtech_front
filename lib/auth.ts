@@ -12,6 +12,13 @@ interface loginRequestParams {
   password: string;
 }
 
+export interface AuthUserSummary {
+  id: string
+  name: string
+  email: string
+  active: boolean
+}
+
 let meRequestPromise: Promise<any | null> | null = null;
 let meCacheValue: any | null = null;
 let meCacheAt = 0;
@@ -83,4 +90,19 @@ export async function getMe() {
   });
 
   return meRequestPromise;
+}
+
+export async function getUsers(): Promise<AuthUserSummary[]> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, {
+    credentials: 'include',
+    headers: {
+      'x-api-key': `${process.env.NEXT_PUBLIC_API_KEY}`,
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error('Erro ao listar usuarios')
+  }
+
+  return await res.json()
 }
