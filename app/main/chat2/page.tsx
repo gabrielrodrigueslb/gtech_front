@@ -1,4 +1,4 @@
-import { CheckCheck, Search } from 'lucide-react';
+import { CheckCheck, CirclePlus, Search } from 'lucide-react';
 import ContactList from './components/ContactList';
 import ChatHeader from './components/ChatHeader';
 import ChatFooter from './components/ChatFooter';
@@ -12,14 +12,18 @@ export default function page() {
           id="contact-list"
           className="w-[320px] shrink-0 h-full bg-card flex flex-col overflow-hidden border-border/50 border-r"
         >
-          <div className="flex m-3 bg-background px-4 py-2 rounded-2xl gap-2 items-center">
+          <div className="flex mt-3 mx-3 bg-background px-4 py-2 rounded-2xl gap-2 items-center">
             <Search className="cursor-pointer" />
             <input
-              className="w-full text-sm"
+              className="w-full text-sm focus:outline-none"
               type="text"
               placeholder="Pesquise ou inicie um novo chat"
             />
           </div>
+
+          <button className="bg-primary m-3 font-semibold flex gap-2 items-center justify-center py-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity">
+            <CirclePlus /> Novo Atendimento
+          </button>
 
           <ContactList />
 

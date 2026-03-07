@@ -12,12 +12,12 @@ interface ContactProps{
 export default function ContactCard({lastMessage, nomeContato, hora, online, isActive, noRead}:ContactProps) {
 
   return (
-    <li className={`${isActive && 'bg-white/10'} w-full flex items-center px-3 py-4 gap-2`}>
+    <li className={`${isActive && 'bg-white/10'} w-full flex items-center px-3 py-4 gap-2 hover:bg-white/10 cursor-pointer transition-all`}>
       <UserProfile online={online} username='Gabriel'/>
       <div className="flex flex-col flex-1 gap-1 font-light overflow-hidden">
         <span className="flex justify-between items-center">
           <h4 className="font-medium">{nomeContato || 'Contato'}</h4>
-          <p className="text-xs opacity-50">{hora || '00:00'}</p>
+          <p className={`text-xs opacity-50 ${noRead && 'text-primary opacity-100 font-semibold'}`}>{hora || '00:00'}</p>
         </span>
 
         <span className="flex justify-between items-center gap-3">
