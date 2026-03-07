@@ -1,8 +1,9 @@
-import { CirclePlus, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import ContactList from './components/ContactList'
 import ChatHeader from './components/ChatHeader'
 import ChatFooter from './components/ChatFooter'
 import ChatMessages from './components/ChatMessages'
+import NewConversationButton from './components/NewConversationButton'
 import { WhatsAppProvider } from '@/context/Whatsappcontext'
 
 export default function ChatPage() {
@@ -29,9 +30,7 @@ function ChatPageInner() {
           />
         </div>
 
-        <button className="bg-primary m-3 font-semibold flex gap-2 items-center justify-center py-3 rounded-xl cursor-pointer hover:opacity-80 transition-opacity">
-          <CirclePlus /> Novo Atendimento
-        </button>
+        <NewConversationButton />
 
         <ContactList />
       </section>

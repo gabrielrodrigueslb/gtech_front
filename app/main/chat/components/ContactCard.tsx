@@ -1,4 +1,5 @@
 import UserProfile from './UserProfile'
+import { useConversationAvatar } from '@/hooks/useConversationAvatar'
 
 interface ContactProps {
   conversationId: string
@@ -14,6 +15,7 @@ interface ContactProps {
 }
 
 export default function ContactCard({
+  conversationId,
   lastMessage,
   nomeContato,
   hora,
@@ -24,12 +26,14 @@ export default function ContactCard({
   status,
   onClick,
 }: ContactProps) {
+  const avatarUrl = useConversationAvatar(conversationId)
+
   return (
     <li
       onClick={onClick}
       className={`${isActive ? 'bg-white/10' : ''} w-full flex items-center px-3 py-4 gap-2 hover:bg-white/10 cursor-pointer transition-all`}
     >
-      <UserProfile online={online} username={nomeContato} />
+      <UserProfile online={online} username={nomeContato} avatarUrl={avatarUrl} />
       <div className="flex flex-col flex-1 gap-1 font-light overflow-hidden">
         <span className="flex justify-between items-center">
           <h4 className="font-medium truncate">{nomeContato || 'Contato'}</h4>

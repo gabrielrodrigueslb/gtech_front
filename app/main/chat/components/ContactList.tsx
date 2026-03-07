@@ -25,7 +25,7 @@ export default function ContactList() {
   if (conversations.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm opacity-40 p-6 text-center">
-        Nenhuma conversa ainda
+        Nenhum atendimento ativo
       </div>
     )
   }

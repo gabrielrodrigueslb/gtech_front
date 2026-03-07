@@ -3,6 +3,10 @@
 import { getMe } from '@/lib/auth';
 import {
   connectWhatsApp,
+  createCloseReason,
+  DEFAULT_WHATSAPP_CLOSE_REASONS,
+  deleteCloseReason,
+  getCloseReasons,
   getWhatsAppSession,
   logoutWhatsApp,
 } from '@/lib/Whatsapp';
@@ -83,6 +87,10 @@ export default function ConfiguracoesPage() {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [closeReasons, setCloseReasons] = useState<string[]>(DEFAULT_WHATSAPP_CLOSE_REASONS);
+  const [newCloseReason, setNewCloseReason] = useState('');
+  const [isSavingCloseReason, setIsSavingCloseReason] = useState(false);
+  const [isRemovingCloseReason, setIsRemovingCloseReason] = useState<string | null>(null);
 
   const statusMeta = STATUS_META[session.status];
   const isAwaitingConnection = session.status === 'CONNECTING' || session.status === 'QR_READY';
@@ -123,6 +131,27 @@ export default function ConfiguracoesPage() {
   useEffect(() => {
     refreshSession();
   }, [refreshSession]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCloseReasons() {
+      try {
+        const reasons = await getCloseReasons();
+        if (isMounted && reasons.length > 0) {
+          setCloseReasons(reasons);
+        }
+      } catch (error) {
+        console.error('[Configuracoes] Erro ao carregar motivos de encerramento:', error);
+      }
+    }
+
+    loadCloseReasons();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
@@ -258,6 +287,40 @@ export default function ConfiguracoesPage() {
       router.replace('/');
     } finally {
       setIsLoggingOut(false);
+    }
+  }
+
+  async function handleAddCloseReason() {
+    const reason = newCloseReason.trim();
+    if (!reason) return;
+
+    setIsSavingCloseReason(true);
+
+    try {
+      const updatedReasons = await createCloseReason(reason);
+      setCloseReasons(updatedReasons);
+      setNewCloseReason('');
+      setFeedback('Motivo de encerramento cadastrado com sucesso.');
+    } catch (error) {
+      console.error('[Configuracoes] Erro ao salvar motivo de encerramento:', error);
+      setFeedback('Nao foi possivel salvar o motivo de encerramento.');
+    } finally {
+      setIsSavingCloseReason(false);
+    }
+  }
+
+  async function handleRemoveCloseReason(reason: string) {
+    setIsRemovingCloseReason(reason);
+
+    try {
+      const updatedReasons = await deleteCloseReason(reason);
+      setCloseReasons(updatedReasons);
+      setFeedback('Motivo removido com sucesso.');
+    } catch (error) {
+      console.error('[Configuracoes] Erro ao remover motivo de encerramento:', error);
+      setFeedback('Nao foi possivel remover o motivo de encerramento.');
+    } finally {
+      setIsRemovingCloseReason(null);
     }
   }
 
@@ -490,6 +553,49 @@ export default function ConfiguracoesPage() {
                       Encerramento da sessao atual para trocar de numero ou reautenticar.
                     </li>
                   </ul>
+                </div>
+
+                <div className="rounded-[24px] border border-white/8 bg-white/3 p-5">
+                  <h3 className="text-lg font-semibold">Motivos de encerramento</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/60">
+                    Cadastre aqui os motivos que aparecem na modal de encerramento do atendimento.
+                  </p>
+
+                  <div className="mt-4 flex gap-3">
+                    <input
+                      value={newCloseReason}
+                      onChange={(event) => setNewCloseReason(event.target.value)}
+                      placeholder="Novo motivo de encerramento"
+                      className="w-full rounded-2xl border border-white/10 bg-background/30 px-4 py-3 text-sm outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCloseReason}
+                      disabled={isSavingCloseReason || !newCloseReason.trim()}
+                      className="shrink-0 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSavingCloseReason ? 'Salvando...' : 'Adicionar'}
+                    </button>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {closeReasons.map((reason) => (
+                      <div
+                        key={reason}
+                        className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-background/30 px-4 py-2 text-sm"
+                      >
+                        <span>{reason}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCloseReason(reason)}
+                          disabled={isRemovingCloseReason === reason}
+                          className="text-white/50 transition hover:text-white disabled:opacity-40"
+                        >
+                          {isRemovingCloseReason === reason ? '...' : 'x'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

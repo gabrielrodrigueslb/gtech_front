@@ -1,22 +1,40 @@
 'use client'
 
 import { ArrowLeftRight, EllipsisVertical, MessageSquareX } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import UserProfile from './UserProfile'
 import { useWhatsApp } from '@/context/Whatsappcontext'
-
-const CLOSE_REASON_OPTIONS = [
-  'Atendimento concluido',
-  'Cliente nao respondeu',
-  'Solicitacao resolvida em outro canal',
-  'Atendimento duplicado',
-]
+import { DEFAULT_WHATSAPP_CLOSE_REASONS, getCloseReasons } from '@/lib/Whatsapp'
+import { useConversationAvatar } from '@/hooks/useConversationAvatar'
 
 export default function ChatHeader() {
   const { activeConversation, closeConversation } = useWhatsApp()
+  const avatarUrl = useConversationAvatar(activeConversation?.id ?? null)
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
-  const [closeReason, setCloseReason] = useState(CLOSE_REASON_OPTIONS[0])
+  const [closeReasonOptions, setCloseReasonOptions] = useState(DEFAULT_WHATSAPP_CLOSE_REASONS)
+  const [closeReason, setCloseReason] = useState(DEFAULT_WHATSAPP_CLOSE_REASONS[0])
   const [isClosing, setIsClosing] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadCloseReasons() {
+      try {
+        const reasons = await getCloseReasons()
+        if (!isMounted || reasons.length === 0) return
+        setCloseReasonOptions(reasons)
+        setCloseReason((current) => current || reasons[0])
+      } catch (_) {
+        if (isMounted) setCloseReasonOptions(DEFAULT_WHATSAPP_CLOSE_REASONS)
+      }
+    }
+
+    loadCloseReasons()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   if (!activeConversation) {
     return (
@@ -36,7 +54,7 @@ export default function ChatHeader() {
 
   function openCloseModal() {
     if (!activeConversation || isClosed) return
-    setCloseReason(CLOSE_REASON_OPTIONS[0])
+    setCloseReason(closeReasonOptions[0] ?? DEFAULT_WHATSAPP_CLOSE_REASONS[0])
     setIsCloseModalOpen(true)
   }
 
@@ -63,7 +81,7 @@ export default function ChatHeader() {
     <>
       <header className="w-full bg-card py-3 px-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <UserProfile online={false} username={name} />
+          <UserProfile online={false} username={name} avatarUrl={avatarUrl} />
           <div className="flex flex-col flex-1 gap-1 font-light overflow-hidden max-w-xs">
             <h4 className="font-medium truncate">{name}</h4>
             <p className="text-xs opacity-50">
@@ -113,7 +131,7 @@ export default function ChatHeader() {
                 onChange={(e) => setCloseReason(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none"
               >
-                {CLOSE_REASON_OPTIONS.map((option) => (
+                {closeReasonOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>

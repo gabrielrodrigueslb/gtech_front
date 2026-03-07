@@ -30,6 +30,7 @@ interface WhatsAppContextValue {
   isLoadingMessages: boolean
   closeConversation: (id: string, reason: string) => Promise<void>
   addOutgoingMessage: (msg: WhatsAppMessage) => void
+  registerConversation: (conversation: WhatsAppConversation) => void
   isConnected: boolean
 }
 
@@ -58,6 +59,34 @@ function dedupeMessages(messages: WhatsAppMessage[]) {
   return messages.reduce<WhatsAppMessage[]>((acc, message) => appendUniqueMessage(acc, message), [])
 }
 
+function sortConversations(conversations: WhatsAppConversation[]) {
+  return [...conversations].sort((a, b) => {
+    const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0
+    const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0
+    return bTime - aTime
+  })
+}
+
+function upsertConversationInList(
+  conversations: WhatsAppConversation[],
+  nextConversation: Partial<WhatsAppConversation>
+) {
+  if (!isConversationVisible(nextConversation) || !nextConversation.id) return conversations
+
+  const existing = conversations.find((conversation) => conversation.id === nextConversation.id)
+  if (!existing) {
+    return sortConversations([nextConversation as WhatsAppConversation, ...conversations])
+  }
+
+  return sortConversations(
+    conversations.map((conversation) =>
+      conversation.id === nextConversation.id
+        ? { ...conversation, ...nextConversation }
+        : conversation
+    )
+  )
+}
+
 export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
   const [isLoadingConversations, setIsLoadingConversations] = useState(true)
@@ -73,7 +102,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     async function loadConversations() {
       try {
         const result = await getConversations({ limit: 50 })
-        setConversations(result.data.filter(isConversationVisible))
+        setConversations(sortConversations(result.data.filter(isConversationVisible)))
       } catch (err) {
         console.error('[WhatsApp] Erro ao carregar conversas:', err)
       } finally {
@@ -115,38 +144,40 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       }))
 
       setConversations((prev) =>
-        prev.map((c) =>
-          c.id === conversationId
-            ? {
-                ...c,
-                lastMessagePreview: conversation?.lastMessagePreview ?? message.body ?? c.lastMessagePreview,
-                lastMessageAt: conversation?.lastMessageAt ?? message.timestamp ?? c.lastMessageAt,
-                unreadCount: conversation?.unreadCount ?? c.unreadCount,
-              }
-            : c
+        sortConversations(
+          prev.map((conversationItem) =>
+            conversationItem.id === conversationId
+              ? {
+                  ...conversationItem,
+                  lastMessagePreview:
+                    conversation?.lastMessagePreview ?? message.body ?? conversationItem.lastMessagePreview,
+                  lastMessageAt:
+                    conversation?.lastMessageAt ?? message.timestamp ?? conversationItem.lastMessageAt,
+                  unreadCount: conversation?.unreadCount ?? conversationItem.unreadCount,
+                }
+              : conversationItem
+          )
         )
       )
 
       setConversations((prev) => {
-        const exists = prev.find((c) => c.id === conversationId)
         if (!conversation) return prev
-
-        const nextConversation = conversation as WhatsAppConversation
-
-        if (!exists && isConversationVisible(nextConversation)) {
-          return [nextConversation, ...prev]
-        }
-
-        return prev
+        return upsertConversationInList(prev, conversation)
       })
+    })
+
+    socket.on('whatsapp:conversation-upserted', ({ conversation }: { conversation: WhatsAppConversation }) => {
+      setConversations((prev) => upsertConversationInList(prev, conversation))
     })
 
     socket.on('whatsapp:message-status', ({ messageId, status }: { messageId: string; status: string }) => {
       setMessagesByConversation((prev) => {
         const updated = { ...prev }
         for (const convId of Object.keys(updated)) {
-          updated[convId] = updated[convId].map((m) =>
-            m.remoteMessageId === messageId ? { ...m, status: status as WhatsAppMessage['status'] } : m
+          updated[convId] = updated[convId].map((message) =>
+            message.remoteMessageId === messageId
+              ? { ...message, status: status as WhatsAppMessage['status'] }
+              : message
           )
         }
         return updated
@@ -154,7 +185,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     })
 
     socket.on('whatsapp:conversation-closed', ({ conversationId }: { conversationId: string }) => {
-      setConversations((prev) => prev.filter((c) => c.id !== conversationId))
+      setConversations((prev) => prev.filter((conversation) => conversation.id !== conversationId))
       setMessagesByConversation((prev) => {
         const updated = { ...prev }
         delete updated[conversationId]
@@ -183,7 +214,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       socketRef.current?.emit('join:conversation', id)
 
       setConversations((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+        prev.map((conversation) => (conversation.id === id ? { ...conversation, unreadCount: 0 } : conversation))
       )
       markConversationAsRead(id).catch(() => {})
 
@@ -192,8 +223,8 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingMessages(true)
       try {
         const { getMessages } = await import('@/lib/Whatsapp')
-        const msgs = await getMessages(id, { limit: 50 })
-        setMessagesByConversation((prev) => ({ ...prev, [id]: dedupeMessages(msgs) }))
+        const messages = await getMessages(id, { limit: 50 })
+        setMessagesByConversation((prev) => ({ ...prev, [id]: dedupeMessages(messages) }))
       } catch (err) {
         console.error('[WhatsApp] Erro ao carregar mensagens:', err)
       } finally {
@@ -205,7 +236,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
 
   const closeConversation = useCallback(async (id: string, reason: string) => {
     await closeConversationApi(id, reason)
-    setConversations((prev) => prev.filter((c) => c.id !== id))
+    setConversations((prev) => prev.filter((conversation) => conversation.id !== id))
     setMessagesByConversation((prev) => {
       const updated = { ...prev }
       delete updated[id]
@@ -223,15 +254,25 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       [msg.conversationId]: appendUniqueMessage(prev[msg.conversationId] ?? [], msg),
     }))
     setConversations((prev) =>
-      prev.map((c) =>
-        c.id === msg.conversationId
-          ? { ...c, lastMessagePreview: msg.body ?? c.lastMessagePreview, lastMessageAt: msg.timestamp }
-          : c
+      sortConversations(
+        prev.map((conversation) =>
+          conversation.id === msg.conversationId
+            ? {
+                ...conversation,
+                lastMessagePreview: msg.body ?? conversation.lastMessagePreview,
+                lastMessageAt: msg.timestamp,
+              }
+            : conversation
+        )
       )
     )
   }, [])
 
-  const activeConversation = conversations.find((c) => c.id === activeConversationId) ?? null
+  const registerConversation = useCallback((conversation: WhatsAppConversation) => {
+    setConversations((prev) => upsertConversationInList(prev, conversation))
+  }, [])
+
+  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null
   const messages = activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : []
 
   return (
@@ -246,6 +287,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
         isLoadingMessages,
         closeConversation,
         addOutgoingMessage,
+        registerConversation,
         isConnected,
       }}
     >
