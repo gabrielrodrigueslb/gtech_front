@@ -58,7 +58,7 @@ export default function ContactCard({
               <span className="text-xs opacity-40">Encerrado</span>
             )}
             {noRead && unreadCount > 0 && (
-              <div className="flex min-w-[20px] h-5 px-1 items-center justify-center rounded-full text-xs bg-primary font-semibold">
+              <div className="flex min-w-5 h-5 px-1 items-center justify-center rounded-full text-xs bg-primary font-semibold">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </div>
             )}

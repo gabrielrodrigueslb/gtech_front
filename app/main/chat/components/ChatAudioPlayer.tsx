@@ -4,11 +4,26 @@ import { Pause, Play } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import AudioBars from './AudioBars'
 
+type ChatAudioPlayerVariant = 'bubble' | 'panel' | 'inline'
+type ChatAudioPlayerTone = 'incoming' | 'outgoing' | 'neutral'
+
 type ChatAudioPlayerProps = {
   src: string
   mimeType?: string | null
   label?: string
-  variant?: 'bubble' | 'panel' | 'inline'
+  variant?: ChatAudioPlayerVariant
+  tone?: ChatAudioPlayerTone
+}
+
+type PlayerTheme = {
+  outer: string
+  shell: string
+  button: string
+  icon: string
+  time: string
+  activeBar: string
+  inactiveBar: string
+  label: string
 }
 
 function formatTime(totalSeconds: number) {
@@ -19,11 +34,67 @@ function formatTime(totalSeconds: number) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
+function getTheme(variant: ChatAudioPlayerVariant, tone: ChatAudioPlayerTone): PlayerTheme {
+  if (variant === 'panel') {
+    return {
+      outer: 'rounded-2xl border border-white/10 bg-white/[0.03] p-4',
+      shell: 'flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-4 py-3',
+      button:
+        'h-11 w-11 border border-primary/25 bg-primary/15 text-primary hover:bg-primary/20',
+      icon: 'text-primary',
+      time: 'text-sm font-medium text-white/65',
+      activeBar: 'bg-primary',
+      inactiveBar: 'bg-white/16',
+      label: 'mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-white/35',
+    }
+  }
+
+  if (variant === 'inline') {
+    return {
+      outer: 'w-full',
+      shell: 'flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-3.5 py-2.5',
+      button:
+        'h-10 w-10 border border-primary/25 bg-primary/15 text-primary hover:bg-primary/20',
+      icon: 'text-primary',
+      time: 'text-xs font-medium text-white/60',
+      activeBar: 'bg-primary',
+      inactiveBar: 'bg-white/18',
+      label: 'sr-only',
+    }
+  }
+
+  if (tone === 'outgoing') {
+    return {
+      outer: 'w-full',
+      shell:
+        'flex items-center gap-3 rounded-full bg-primary px-4 py-3 text-white shadow-[0_10px_30px_rgba(0,153,255,0.18)]',
+      button: 'h-11 w-11 bg-white/14 text-white hover:bg-white/18',
+      icon: 'text-white',
+      time: 'text-sm font-medium text-white/90',
+      activeBar: 'bg-white',
+      inactiveBar: 'bg-white/30',
+      label: 'sr-only',
+    }
+  }
+
+  return {
+    outer: 'w-full',
+    shell: 'flex items-center gap-3 rounded-full border border-white/10 bg-card px-4 py-3 text-white',
+    button: 'h-11 w-11 border border-primary/20 bg-primary/12 text-primary hover:bg-primary/18',
+    icon: 'text-primary',
+    time: 'text-sm font-medium text-white/70',
+    activeBar: 'bg-primary',
+    inactiveBar: 'bg-white/16',
+    label: 'sr-only',
+  }
+}
+
 export default function ChatAudioPlayer({
   src,
   mimeType = 'audio/ogg',
   label = 'Mensagem de audio',
   variant = 'bubble',
+  tone = 'neutral',
 }: ChatAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -36,6 +107,7 @@ export default function ChatAudioPlayer({
 
     const syncTime = () => setCurrentTime(audio.currentTime || 0)
     const syncDuration = () => setDuration(audio.duration || 0)
+    const handlePause = () => setIsPlaying(false)
     const handleEnded = () => {
       setIsPlaying(false)
       setCurrentTime(0)
@@ -44,6 +116,7 @@ export default function ChatAudioPlayer({
     audio.addEventListener('timeupdate', syncTime)
     audio.addEventListener('loadedmetadata', syncDuration)
     audio.addEventListener('durationchange', syncDuration)
+    audio.addEventListener('pause', handlePause)
     audio.addEventListener('ended', handleEnded)
 
     return () => {
@@ -51,6 +124,7 @@ export default function ChatAudioPlayer({
       audio.removeEventListener('timeupdate', syncTime)
       audio.removeEventListener('loadedmetadata', syncDuration)
       audio.removeEventListener('durationchange', syncDuration)
+      audio.removeEventListener('pause', handlePause)
       audio.removeEventListener('ended', handleEnded)
     }
   }, [src])
@@ -59,6 +133,10 @@ export default function ChatAudioPlayer({
     if (!duration) return 0
     return Math.max(0, Math.min(currentTime / duration, 1))
   }, [currentTime, duration])
+
+  const theme = getTheme(variant, tone)
+  const timeLabel =
+    variant === 'panel' ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)
 
   async function togglePlayback() {
     const audio = audioRef.current
@@ -88,76 +166,54 @@ export default function ChatAudioPlayer({
     setCurrentTime(nextTime)
   }
 
-  const isPanel = variant === 'panel'
-  const isInline = variant === 'inline'
-
   return (
-    <div
-      className={
-        isPanel
-          ? 'rounded-2xl border border-white/10 bg-black/15 px-4 py-3'
-          : isInline
-            ? 'rounded-none border-0 bg-transparent px-0 py-0'
-          : 'rounded-[18px] border border-white/10 bg-black/10 px-3 py-2.5'
-      }
-    >
+    <div className={theme.outer}>
       <audio ref={audioRef} preload="metadata">
         <source src={src} type={mimeType ?? 'audio/ogg'} />
       </audio>
 
-      <div className="flex items-center gap-3">
+      <p className={theme.label}>{label}</p>
+
+      <div className={theme.shell}>
         <button
           type="button"
           onClick={togglePlayback}
-          className={`flex shrink-0 cursor-pointer items-center justify-center rounded-full text-white transition hover:opacity-90 ${
-            isPanel
-              ? 'h-11 w-11 bg-primary'
-              : isInline
-                ? 'h-10 w-10 border border-primary/25 bg-primary/15 text-primary'
-                : 'h-9 w-9 bg-white/10'
-          }`}
+          className={`flex shrink-0 cursor-pointer items-center justify-center rounded-full transition ${theme.button}`}
+          aria-label={isPlaying ? 'Pausar audio' : 'Reproduzir audio'}
         >
-          {isPlaying ? <Pause size={18} /> : <Play size={18} className="translate-x-[1px]" />}
+          {isPlaying ? (
+            <Pause size={18} className={theme.icon} />
+          ) : (
+            <Play size={18} className={`${theme.icon} translate-x-px`} />
+          )}
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            {isPanel ? (
-              <p className="truncate text-xs font-medium uppercase tracking-[0.18em] text-white/45">
-                {label}
-              </p>
-            ) : isInline ? (
-              <p className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-white/35">
-                {label}
-              </p>
-            ) : (
-              <p className="sr-only">{label}</p>
-            )}
-            <span className="shrink-0 text-xs text-white/55">
-              {isPanel || isInline
-                ? `${formatTime(currentTime)} / ${formatTime(duration)}`
-                : formatTime(duration)}
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="relative min-w-0 flex-1">
+              <AudioBars
+                progress={progress}
+                isActive={isPlaying}
+                liveLevel={isPlaying ? 0.35 : 0}
+                className="h-8"
+                barClassName="w-[3px] sm:w-[4px]"
+                activeBarClassName={theme.activeBar}
+                inactiveBarClassName={theme.inactiveBar}
+              />
+              <input
+                type="range"
+                min={0}
+                max={1000}
+                step={1}
+                value={Math.round(progress * 1000)}
+                onChange={handleSeek}
+                className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+                aria-label={label}
+              />
+            </div>
+
+            <span className={`shrink-0 tabular-nums ${theme.time}`}>{timeLabel}</span>
           </div>
-
-          <AudioBars
-            progress={progress}
-            isActive={isPlaying}
-            liveLevel={isPlaying ? 0.45 : 0}
-            className={isPanel ? 'mt-3' : isInline ? 'mt-1.5' : 'mt-2'}
-          />
-
-          <input
-            type="range"
-            min={0}
-            max={1000}
-            step={1}
-            value={Math.round(progress * 1000)}
-            onChange={handleSeek}
-            className={`mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full accent-primary ${
-              isPanel ? 'bg-white/10' : isInline ? 'bg-white/10' : 'bg-white/8'
-            }`}
-          />
         </div>
       </div>
     </div>

@@ -370,7 +370,7 @@ export default function ConversationDetailsDrawer({
                           className={`rounded-full border px-3 py-2 text-xs font-medium transition disabled:opacity-50 cursor-pointer ${
                             isSelected
                               ? 'border-primary bg-primary/20 text-primary'
-                              : 'border-white/10 bg-white/[0.03] text-white/65 hover:bg-white/8'
+                              : 'border-white/10 bg-white/3 text-white/65 hover:bg-white/8'
                           }`}
                         >
                           {tag}
@@ -428,7 +428,7 @@ export default function ConversationDetailsDrawer({
                 </Section>
 
                 <Section title="Descricao">
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-5 text-sm leading-6 text-white/72">
+                  <div className="rounded-3xl border border-white/10 bg-white/3 px-4 py-5 text-sm leading-6 text-white/72">
                     {formData.notes || 'Nenhuma descricao adicionada ate o momento.'}
                   </div>
                 </Section>

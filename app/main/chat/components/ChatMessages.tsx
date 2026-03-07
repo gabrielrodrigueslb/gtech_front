@@ -98,11 +98,13 @@ export default function ChatMessages() {
               {label}
             </span>
 
-            {msgs.map((msg) => {
+            {msgs.map((msg, index) => {
               const timeLabel = new Date(msg.timestamp).toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
                 minute: '2-digit',
               })
+              const nextMessage = msgs[index + 1]
+              const showIncomingAvatar = !nextMessage || nextMessage.fromMe
 
               if (msg.fromMe) {
                 return (
@@ -131,7 +133,11 @@ export default function ChatMessages() {
 
               return (
                 <div key={msg.id} className="message-card flex items-start gap-2 max-w-[60%]">
-                  <UserProfile username={msg.remoteJid.split('@')[0]} avatarUrl={avatarUrl} />
+                  {showIncomingAvatar ? (
+                    <UserProfile username={msg.remoteJid.split('@')[0]} avatarUrl={avatarUrl} />
+                  ) : (
+                    <div aria-hidden className="h-[52px] w-[52px] shrink-0" />
+                  )}
                   <div className="message min-w-0 flex flex-col gap-1.5">
                     <div className={getBubbleClassName(msg, false)}>
                       <MessageContent
@@ -232,8 +238,14 @@ function MessageContent({
 
   if (message.type === 'audio' && mediaUrl) {
     return (
-      <div className="space-y-2 min-w-[220px]">
-        <ChatAudioPlayer src={mediaUrl} mimeType={message.mediaMimeType} label="Audio" variant="bubble" />
+      <div className="min-w-[240px] max-w-[320px] space-y-2">
+        <ChatAudioPlayer
+          src={mediaUrl}
+          mimeType={message.mediaMimeType}
+          label="Audio"
+          variant="bubble"
+          tone={message.fromMe ? 'outgoing' : 'incoming'}
+        />
         {message.body && <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>}
       </div>
     )

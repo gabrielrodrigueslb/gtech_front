@@ -438,7 +438,7 @@ export default function ConfiguracoesPage() {
         {false && (
         <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
           <div className="space-y-6">
-            <article className="rounded-[24px] border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+            <article className="rounded-3xl border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
               <div className="mb-6 flex items-center gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-xl font-bold text-black">
                   {user?.name?.slice(0, 2).toUpperCase() ?? 'US'}
@@ -465,7 +465,7 @@ export default function ConfiguracoesPage() {
               </div>
             </article>
 
-            <article className="rounded-[24px] border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+            <article className="rounded-3xl border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-white/5 p-3">
                   {session.status === 'CONNECTED' ? <Wifi size={20} /> : <WifiOff size={20} />}
@@ -489,7 +489,7 @@ export default function ConfiguracoesPage() {
             </article>
           </div>
 
-          <article className="rounded-[24px] border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+          <article className="rounded-3xl border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
             <div className="flex flex-col gap-5 border-b border-white/8 pb-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
@@ -545,7 +545,7 @@ export default function ConfiguracoesPage() {
             </div>
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-              <div className="rounded-[24px] border border-dashed border-white/12 bg-background/40 p-5">
+              <div className="rounded-3xl border border-dashed border-white/12 bg-background/40 p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="rounded-2xl bg-white/5 p-3">
                     <QrCode size={20} />
@@ -558,7 +558,7 @@ export default function ConfiguracoesPage() {
                   </div>
                 </div>
 
-                <div className="flex min-h-[320px] items-center justify-center rounded-[22px] border border-white/8 bg-white p-4">
+                <div className="flex min-h-80 items-center justify-center rounded-[22px] border border-white/8 bg-white p-4">
                   {isLoadingSession ? (
                     <LoaderCircle className="animate-spin text-slate-700" size={28} />
                   ) : session.qrCodeDataUrl ? (
@@ -579,7 +579,7 @@ export default function ConfiguracoesPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-[24px] border border-white/8 bg-white/3 p-5">
+                <div className="rounded-3xl border border-white/8 bg-white/3 p-5">
                   <h3 className="text-lg font-semibold">Resumo da sessao</h3>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <SummaryItem
@@ -605,7 +605,7 @@ export default function ConfiguracoesPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-white/8 bg-white/3 p-5">
+                <div className="rounded-3xl border border-white/8 bg-white/3 p-5">
                   <h3 className="text-lg font-semibold">O que esta pronto nesta tela</h3>
                   <ul className="mt-4 space-y-3 text-sm leading-6 text-white/70">
                     <li className="rounded-2xl border border-white/8 bg-background/30 px-4 py-3">
@@ -623,7 +623,7 @@ export default function ConfiguracoesPage() {
                   </ul>
                 </div>
 
-                <div className="rounded-[24px] border border-white/8 bg-white/3 p-5">
+                <div className="rounded-3xl border border-white/8 bg-white/3 p-5">
                   <h3 className="text-lg font-semibold">Motivos de encerramento</h3>
                   <p className="mt-2 text-sm leading-6 text-white/60">
                     Cadastre aqui os motivos que aparecem na modal de encerramento do atendimento.
@@ -666,7 +666,7 @@ export default function ConfiguracoesPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-white/8 bg-white/3 p-5">
+                <div className="rounded-3xl border border-white/8 bg-white/3 p-5">
                   <h3 className="text-lg font-semibold">Tags padronizadas de clientes</h3>
                   <p className="mt-2 text-sm leading-6 text-white/60">
                     Cadastre as tags disponiveis para vincular nos atendimentos, sem escrita livre.
@@ -809,7 +809,7 @@ function SettingsTabbedSections({
   const userInitials = user?.name?.slice(0, 2)?.toUpperCase() ?? 'US';
 
   return (
-    <section className="rounded-[24px] border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+    <section className="rounded-3xl border border-white/10 bg-card p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
       <Tabs defaultValue="whatsapp" className="gap-6">
         <div className="flex flex-col gap-5 border-b border-white/8 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
@@ -853,7 +853,7 @@ function SettingsTabbedSections({
 
         <TabsContent value="usuario">
           <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <article className="rounded-[24px] border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+            <article className="rounded-3xl border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
               <div className="mb-6 flex items-center gap-4">
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-xl font-bold text-black">
                   {userInitials}
@@ -881,7 +881,7 @@ function SettingsTabbedSections({
             </article>
 
             <div className="space-y-6">
-              <article className="rounded-[24px] border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+              <article className="rounded-3xl border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
                 <div className="flex flex-col gap-4 border-b border-white/8 pb-5 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <h3 className="text-lg font-semibold">Sessao da conta</h3>
@@ -907,7 +907,7 @@ function SettingsTabbedSections({
                 </div>
               </article>
 
-              <article className="rounded-[24px] border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+              <article className="rounded-3xl border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
                 <h3 className="text-lg font-semibold">Acesso rapido</h3>
                 <div className="mt-4 grid gap-4 md:grid-cols-3">
                   <SummaryItem
@@ -934,7 +934,7 @@ function SettingsTabbedSections({
         <TabsContent value="whatsapp">
           <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
             <div className="space-y-6">
-              <article className="rounded-[24px] border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+              <article className="rounded-3xl border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
                 <div className="flex items-center gap-3">
                   <div className="rounded-2xl bg-white/5 p-3">
                     {session.status === 'CONNECTED' ? <Wifi size={20} /> : <WifiOff size={20} />}
@@ -958,7 +958,7 @@ function SettingsTabbedSections({
               </article>
             </div>
 
-            <article className="rounded-[24px] border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+            <article className="rounded-3xl border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
               <div className="flex flex-col gap-5 border-b border-white/8 pb-6 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-3">
@@ -1016,7 +1016,7 @@ function SettingsTabbedSections({
               </div>
 
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-                <div className="rounded-[24px] border border-dashed border-white/12 bg-card p-5">
+                <div className="rounded-3xl border border-dashed border-white/12 bg-card p-5">
                   <div className="mb-4 flex items-center gap-3">
                     <div className="rounded-2xl bg-white/5 p-3">
                       <QrCode size={20} />
@@ -1029,7 +1029,7 @@ function SettingsTabbedSections({
                     </div>
                   </div>
 
-                  <div className="flex min-h-[320px] items-center justify-center rounded-[22px] border border-white/8 bg-white p-4">
+                  <div className="flex min-h-80 items-center justify-center rounded-[22px] border border-white/8 bg-white p-4">
                     {isLoadingSession ? (
                       <LoaderCircle className="animate-spin text-slate-700" size={28} />
                     ) : session.qrCodeDataUrl ? (
@@ -1050,7 +1050,7 @@ function SettingsTabbedSections({
                 </div>
 
                 <div className="space-y-4">
-                  <div className="rounded-[24px] border border-white/8 bg-white/3 p-5">
+                  <div className="rounded-3xl border border-white/8 bg-white/3 p-5">
                     <h4 className="text-lg font-semibold">Resumo da sessao</h4>
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <SummaryItem
@@ -1080,7 +1080,7 @@ function SettingsTabbedSections({
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-white/8 bg-white/3 p-5">
+                  <div className="rounded-3xl border border-white/8 bg-white/3 p-5">
                     <h4 className="text-lg font-semibold">O que esta pronto nesta area</h4>
                     <ul className="mt-4 space-y-3 text-sm leading-6 text-white/70">
                       <li className="rounded-2xl border border-white/8 bg-background/30 px-4 py-3">
@@ -1105,7 +1105,7 @@ function SettingsTabbedSections({
 
         <TabsContent value="sistema">
           <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <article className="rounded-[24px] border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+            <article className="rounded-3xl border border-white/10 bg-background/30 p-6 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
               <h3 className="text-lg font-semibold">Padroes operacionais</h3>
               <p className="mt-3 text-sm leading-6 text-white/60">
                 Centralize aqui as listas padronizadas usadas no atendimento para manter a equipe
@@ -1127,7 +1127,7 @@ function SettingsTabbedSections({
             </article>
 
             <div className="space-y-6">
-              <article className="rounded-[24px] border border-white/10 bg-background/30 p-5 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+              <article className="rounded-3xl border border-white/10 bg-background/30 p-5 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
                 <h3 className="text-lg font-semibold">Motivos de encerramento</h3>
                 <p className="mt-2 text-sm leading-6 text-white/60">
                   Cadastre aqui os motivos que aparecem na modal de encerramento do atendimento.
@@ -1170,7 +1170,7 @@ function SettingsTabbedSections({
                 </div>
               </article>
 
-              <article className="rounded-[24px] border border-white/10 bg-background/30 p-5 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
+              <article className="rounded-3xl border border-white/10 bg-background/30 p-5 shadow-[0_12px_50px_rgba(0,0,0,0.14)]">
                 <h3 className="text-lg font-semibold">Tags padronizadas de clientes</h3>
                 <p className="mt-2 text-sm leading-6 text-white/60">
                   Cadastre as tags disponiveis para vincular nos atendimentos, sem escrita livre.

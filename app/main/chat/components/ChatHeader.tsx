@@ -204,7 +204,7 @@ export default function ChatHeader() {
                     type="button"
                     onClick={() => handleTransfer(agent.id)}
                     disabled={isTransferring}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-left transition hover:bg-white/8 disabled:opacity-50 cursor-pointer"
+                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/3 px-4 py-4 text-left transition hover:bg-white/8 disabled:opacity-50 cursor-pointer"
                   >
                     <div>
                       <p className="font-medium">{agent.name}</p>
