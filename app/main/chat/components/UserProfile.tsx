@@ -3,6 +3,7 @@ interface UserProfileProps {
   online?: boolean
   avatarUrl?: string | null
   username: string
+  className?: string
 }
 
 function getInitials(username: string) {
@@ -16,12 +17,17 @@ function getInitials(username: string) {
   return `${parts[0][0]}${parts[1][0]}`
 }
 
-export default function UserProfile({ online, avatarUrl, username }: UserProfileProps) {
+export default function UserProfile({
+  online,
+  avatarUrl,
+  username,
+  className = '',
+}: UserProfileProps) {
   const iniciaisContato = getInitials(username).toUpperCase()
   return (
     <div
       id="user-photo"
-      className="shrink-0 w-[52px] h-[52px] bg-background rounded-full relative items-center justify-center flex font-medium text-sm uppercase border-border border-1 overflow-hidden"
+      className={`relative flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-full border-1 border-border bg-background text-sm font-medium uppercase ${className}`}
     >
       {avatarUrl ? (
         <img

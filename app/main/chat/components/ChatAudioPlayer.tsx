@@ -38,11 +38,11 @@ function getTheme(variant: ChatAudioPlayerVariant, tone: ChatAudioPlayerTone): P
   if (variant === 'panel') {
     return {
       outer: 'rounded-2xl border border-white/10 bg-white/[0.03] p-4',
-      shell: 'flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-4 py-3',
+      shell: 'flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-3.5 py-2.5 sm:px-4 sm:py-3',
       button:
-        'h-11 w-11 border border-primary/25 bg-primary/15 text-primary hover:bg-primary/20',
+        'h-9 w-9 border border-primary/25 bg-primary/15 text-primary hover:bg-primary/20 sm:h-11 sm:w-11',
       icon: 'text-primary',
-      time: 'text-sm font-medium text-white/65',
+      time: 'text-xs font-medium text-white/65 sm:text-sm',
       activeBar: 'bg-primary',
       inactiveBar: 'bg-white/16',
       label: 'mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-white/35',
@@ -52,9 +52,9 @@ function getTheme(variant: ChatAudioPlayerVariant, tone: ChatAudioPlayerTone): P
   if (variant === 'inline') {
     return {
       outer: 'w-full',
-      shell: 'flex items-center gap-3 rounded-full border border-white/10 bg-black/10 px-3.5 py-2.5',
+      shell: 'flex items-center gap-2.5 rounded-full border border-white/10 bg-black/10 px-3 py-2 sm:gap-3 sm:px-3.5 sm:py-2.5',
       button:
-        'h-10 w-10 border border-primary/25 bg-primary/15 text-primary hover:bg-primary/20',
+        'h-[34px] w-[34px] border border-primary/25 bg-primary/15 text-primary hover:bg-primary/20 sm:h-10 sm:w-10',
       icon: 'text-primary',
       time: 'text-xs font-medium text-white/60',
       activeBar: 'bg-primary',
@@ -67,10 +67,10 @@ function getTheme(variant: ChatAudioPlayerVariant, tone: ChatAudioPlayerTone): P
     return {
       outer: 'w-full',
       shell:
-        'flex items-center gap-3 rounded-full bg-primary px-4 py-3 text-white shadow-[0_10px_30px_rgba(0,153,255,0.18)]',
-      button: 'h-11 w-11 bg-white/14 text-white hover:bg-white/18',
+        'flex items-center gap-2.5 rounded-full bg-primary px-3 py-2.5 text-white shadow-[0_10px_24px_rgba(0,153,255,0.16)] sm:gap-3 sm:px-4 sm:py-3',
+      button: 'h-9 w-9 bg-white/14 text-white hover:bg-white/18 sm:h-11 sm:w-11',
       icon: 'text-white',
-      time: 'text-sm font-medium text-white/90',
+      time: 'text-xs font-medium text-white/90 sm:text-sm',
       activeBar: 'bg-white',
       inactiveBar: 'bg-white/30',
       label: 'sr-only',
@@ -79,10 +79,10 @@ function getTheme(variant: ChatAudioPlayerVariant, tone: ChatAudioPlayerTone): P
 
   return {
     outer: 'w-full',
-    shell: 'flex items-center gap-3 rounded-full border border-white/10 bg-card px-4 py-3 text-white',
-    button: 'h-11 w-11 border border-primary/20 bg-primary/12 text-primary hover:bg-primary/18',
+    shell: 'flex items-center gap-2.5 rounded-full border border-white/10 bg-card px-3 py-2.5 text-white sm:gap-3 sm:px-4 sm:py-3',
+    button: 'h-9 w-9 border border-primary/20 bg-primary/12 text-primary hover:bg-primary/18 sm:h-11 sm:w-11',
     icon: 'text-primary',
-    time: 'text-sm font-medium text-white/70',
+    time: 'text-xs font-medium text-white/70 sm:text-sm',
     activeBar: 'bg-primary',
     inactiveBar: 'bg-white/16',
     label: 'sr-only',
@@ -195,8 +195,8 @@ export default function ChatAudioPlayer({
                 progress={progress}
                 isActive={isPlaying}
                 liveLevel={isPlaying ? 0.35 : 0}
-                className="h-8"
-                barClassName="w-[3px] sm:w-[4px]"
+                className="h-7 sm:h-8"
+                barClassName="w-[2px] sm:w-[4px]"
                 activeBarClassName={theme.activeBar}
                 inactiveBarClassName={theme.inactiveBar}
               />

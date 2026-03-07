@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getMe, loginRequest } from '@/lib/auth';
+import { loginRequest } from '@/lib/auth';
 
 export default function Login() {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -69,13 +71,23 @@ bg-gray-600/10 backdrop-blur-xl border border-gray-400/10 text-white"
 
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-200">Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="border border-gray-400/10 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Senha"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-400/10 p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Senha"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute inset-y-0 right-0 flex w-12 cursor-pointer items-center justify-center text-gray-300 transition hover:text-white"
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {error && (

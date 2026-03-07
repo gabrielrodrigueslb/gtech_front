@@ -90,10 +90,10 @@ export default function ChatMessages() {
     <>
       <div
         ref={scrollContainerRef}
-        className="messages flex-1 overflow-x-hidden overflow-y-auto flex p-6 items-start flex-col gap-3"
+        className="messages flex flex-1 flex-col items-start gap-2 overflow-x-hidden overflow-y-auto p-3 md:gap-3 md:p-6"
       >
         {groupedMessages.map(({ label, msgs }) => (
-          <div key={label} className="w-full flex flex-col gap-6">
+          <div key={label} className="flex w-full flex-col gap-4 md:gap-6">
             <span className="py-1 px-4 self-center bg-card rounded-full text-xs font-semibold">
               {label}
             </span>
@@ -110,7 +110,7 @@ export default function ChatMessages() {
                 return (
                   <div
                     key={msg.id}
-                    className="message-card flex flex-row-reverse gap-2 self-end max-w-[60%]"
+                    className="message-card flex max-w-[80%] flex-row-reverse gap-2 self-end md:max-w-[60%]"
                   >
                     <div className="message min-w-0 flex flex-col gap-1.5">
                       <div className={getBubbleClassName(msg, true)}>
@@ -132,11 +132,15 @@ export default function ChatMessages() {
               }
 
               return (
-                <div key={msg.id} className="message-card flex items-start gap-2 max-w-[60%]">
+                <div key={msg.id} className="message-card flex max-w-[80%] items-start gap-2 md:max-w-[60%]">
                   {showIncomingAvatar ? (
-                    <UserProfile username={msg.remoteJid.split('@')[0]} avatarUrl={avatarUrl} />
+                    <UserProfile
+                      username={msg.remoteJid.split('@')[0]}
+                      avatarUrl={avatarUrl}
+                      className="h-10 w-10 text-xs md:h-[52px] md:w-[52px] md:text-sm"
+                    />
                   ) : (
-                    <div aria-hidden className="h-[52px] w-[52px] shrink-0" />
+                    <div aria-hidden className="h-10 w-10 shrink-0 md:h-[52px] md:w-[52px]" />
                   )}
                   <div className="message min-w-0 flex flex-col gap-1.5">
                     <div className={getBubbleClassName(msg, false)}>
@@ -218,7 +222,7 @@ function MessageContent({
           <img
             src={mediaUrl}
             alt={message.body ?? 'Imagem enviada'}
-            className="max-h-[180px] max-w-[280px] rounded-xl object-cover transition hover:scale-[1.01]"
+            className="max-h-[145px] max-w-[210px] rounded-xl object-cover transition hover:scale-[1.01] sm:max-h-[165px] sm:max-w-[240px] md:max-h-[180px] md:max-w-[280px]"
           />
         </button>
         {message.body && <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>}
@@ -238,7 +242,7 @@ function MessageContent({
 
   if (message.type === 'audio' && mediaUrl) {
     return (
-      <div className="min-w-[240px] max-w-[320px] space-y-2">
+      <div className="min-w-[180px] max-w-[230px] space-y-2 sm:min-w-[200px] sm:max-w-[260px] md:min-w-[240px] md:max-w-[320px]">
         <ChatAudioPlayer
           src={mediaUrl}
           mimeType={message.mediaMimeType}

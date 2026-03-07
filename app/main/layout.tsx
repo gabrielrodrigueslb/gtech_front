@@ -1,7 +1,6 @@
-﻿import Header from '@/components/header';
-import Sidebar from '@/components/sidebar';
-import { CRMProvider } from '@/context/crm-context';
-import { FunnelProvider } from '@/context/funnel-context';
+import Sidebar from '@/components/sidebar'
+import { CRMProvider } from '@/context/crm-context'
+import { FunnelProvider } from '@/context/funnel-context'
 
 export const viewport = {
   themeColor: '#11182b',
@@ -9,32 +8,24 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-};
+}
 
 export default function MainLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <div
-      className="h-screen flex-col-reverse md:flex-row flex w-screen overflow-hidden animate-in transition-opacity
-        duration-300 ease-in-out"
-    >
-      {/* CONTEÚDO ABAIXO DO HEADER */}
-      <main className="flex flex-1 min-h-0 min-w-0">
+    <div className="flex h-screen w-screen flex-col overflow-hidden animate-in transition-opacity duration-300 ease-in-out md:flex-row">
+      <main className="flex min-h-0 min-w-0 flex-1">
         <FunnelProvider>
-          {/* SIDEBAR */}
           <Sidebar />
 
-          {/* ÁREA DAS PÁGINAS */}
-          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4 section-content">
-              <CRMProvider>
-                {children}
-              </CRMProvider>
+          <div className="section-content flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-4">
+            <CRMProvider>{children}</CRMProvider>
           </div>
         </FunnelProvider>
       </main>
     </div>
-  );
+  )
 }

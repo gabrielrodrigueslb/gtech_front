@@ -15,6 +15,7 @@ import type { WhatsAppConversation } from '@/types/Whatsapp.types'
 type ContactListProps = {
   filter: 'mine' | 'unassigned'
   searchQuery?: string
+  onConversationOpen?: () => void
 }
 
 function normalizeSearchValue(value?: string | null) {
@@ -29,7 +30,11 @@ function extractDigits(value?: string | null) {
   return (value ?? '').replace(/\D/g, '')
 }
 
-export default function ContactList({ filter, searchQuery = '' }: ContactListProps) {
+export default function ContactList({
+  filter,
+  searchQuery = '',
+  onConversationOpen,
+}: ContactListProps) {
   const {
     conversations,
     isLoadingConversations,
@@ -135,6 +140,7 @@ export default function ContactList({ filter, searchQuery = '' }: ContactListPro
             unreadCount={conv.unreadCount}
             status={conv.status}
             onClick={() => {
+              onConversationOpen?.()
               void setActiveConversation(conv.id)
             }}
           />

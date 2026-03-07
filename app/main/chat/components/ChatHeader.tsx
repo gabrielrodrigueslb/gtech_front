@@ -1,12 +1,17 @@
 'use client'
 
-import { ArrowLeftRight, EllipsisVertical, MessageSquareX } from 'lucide-react'
+import { ArrowLeftRight, ChevronLeft, EllipsisVertical, MessageSquareX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import UserProfile from './UserProfile'
 import ConversationDetailsDrawer from './ConversationDetailsDrawer'
 import { useWhatsApp } from '@/context/Whatsappcontext'
 import { DEFAULT_WHATSAPP_CLOSE_REASONS, getCloseReasons } from '@/lib/Whatsapp'
 import { useConversationAvatar } from '@/hooks/useConversationAvatar'
+
+type ChatHeaderProps = {
+  showBackButton?: boolean
+  onBack?: () => void
+}
 
 function formatPhone(value?: string | null) {
   const digits = String(value ?? '').replace(/\D/g, '')
@@ -34,7 +39,10 @@ function getConversationPhone(phone?: string | null, remoteJid?: string | null) 
   return phone ?? String(remoteJid ?? '').split('@')[0] ?? ''
 }
 
-export default function ChatHeader() {
+export default function ChatHeader({
+  showBackButton = false,
+  onBack,
+}: ChatHeaderProps) {
   const {
     activeConversation,
     closeConversation,
@@ -130,8 +138,18 @@ export default function ChatHeader() {
 
   return (
     <>
-      <header className="w-full bg-card py-3 px-4 flex justify-between items-center gap-4">
+      <header className="flex w-full items-center justify-between gap-3 bg-card px-3 py-3 md:px-4">
         <div className="flex items-center gap-3 min-w-0">
+          {showBackButton ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition hover:bg-white/10"
+              aria-label="Voltar para atendimentos"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          ) : null}
           <UserProfile username={name} avatarUrl={avatarUrl} />
           <div className="flex min-w-0 flex-col flex-1 gap-1 font-light overflow-hidden">
             <h4 className="font-medium truncate">{name}</h4>
@@ -141,11 +159,11 @@ export default function ChatHeader() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <button
             type="button"
             onClick={() => setIsDetailsDrawerOpen(true)}
-            className="rounded-xl p-2 transition hover:bg-white/10 cursor-pointer"
+            className="cursor-pointer rounded-xl p-2 transition hover:bg-white/10"
           >
             <EllipsisVertical size={18} />
           </button>
@@ -153,7 +171,7 @@ export default function ChatHeader() {
           <button
             type="button"
             onClick={() => setIsTransferModalOpen(true)}
-            className="rounded-xl p-2 transition hover:bg-white/10 cursor-pointer"
+            className="cursor-pointer rounded-xl p-2 transition hover:bg-white/10"
           >
             <ArrowLeftRight size={18} />
           </button>
@@ -161,12 +179,13 @@ export default function ChatHeader() {
           {!isClosed ? (
             <button
               onClick={openCloseModal}
-              className="flex gap-2 text-sm p-3 bg-primary rounded-xl ml-2 cursor-pointer hover:opacity-80 transition-opacity"
+              className="ml-1 flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm transition-opacity hover:opacity-80 md:ml-2 md:p-3"
             >
-              <MessageSquareX size={18} /> Encerrar Atendimento
+              <MessageSquareX size={18} />
+              <span className="hidden sm:inline">Encerrar Atendimento</span>
             </button>
           ) : (
-            <span className="text-xs opacity-40 ml-2 px-3 py-2 border border-white/10 rounded-xl">
+            <span className="ml-1 rounded-xl border border-white/10 px-3 py-2 text-xs opacity-40 md:ml-2">
               Encerrado
             </span>
           )}

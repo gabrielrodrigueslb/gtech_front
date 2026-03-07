@@ -1,13 +1,14 @@
 'use client';
 
 import { Search } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ContactList from './components/ContactList';
 import ChatHeader from './components/ChatHeader';
 import ChatFooter from './components/ChatFooter';
 import ChatMessages from './components/ChatMessages';
 import NewConversationButton from './components/NewConversationButton';
 import { WhatsAppProvider, useWhatsApp } from '@/context/Whatsappcontext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function ChatPage() {
   return (
@@ -18,9 +19,12 @@ export default function ChatPage() {
 }
 
 function ChatPageInner() {
-  const { conversations, currentUserId } = useWhatsApp();
+  const { conversations, currentUserId, activeConversationId } = useWhatsApp();
+  const isMobile = useIsMobile();
   const [queueFilter, setQueueFilter] = useState<'mine' | 'unassigned'>('mine');
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+  const previousActiveConversationRef = useRef<string | null>(null);
   const myCount = conversations.filter(
     (conversation) => conversation.assignedUserId === currentUserId,
   ).length;
@@ -28,11 +32,36 @@ function ChatPageInner() {
     (conversation) => !conversation.assignedUserId,
   ).length;
 
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileView('chat');
+      previousActiveConversationRef.current = activeConversationId;
+      return;
+    }
+
+    if (!activeConversationId) {
+      setMobileView('list');
+      previousActiveConversationRef.current = null;
+      return;
+    }
+
+    if (previousActiveConversationRef.current !== activeConversationId) {
+      setMobileView('chat');
+    }
+
+    previousActiveConversationRef.current = activeConversationId;
+  }, [activeConversationId, isMobile]);
+
+  const showMobileChat = isMobile && mobileView === 'chat' && !!activeConversationId;
+  const showMobileList = !isMobile || mobileView === 'list' || !activeConversationId;
+
   return (
-    <main className="bg-card max-w-screen max-h-screen h-full flex rounded-2xl overflow-hidden">
+    <main className="-mx-4 -mt-4 flex h-[calc(100%+1rem)] w-[calc(100%+2rem)] max-h-screen max-w-none overflow-hidden bg-card md:mx-0 md:mt-0 md:h-full md:w-auto md:max-w-screen md:rounded-2xl">
       <section
         id="contact-list"
-        className="w-[360px] shrink-0 h-full bg-card flex flex-col overflow-hidden border-border/50 border-r"
+        className={`h-full w-full shrink-0 flex-col overflow-hidden bg-card md:flex md:w-[360px] md:border-r md:border-border/50 ${
+          showMobileList ? 'flex' : 'hidden'
+        }`}
       >
         <div className="mx-3 my-4 grid grid-cols-2 gap-2 ">
           <button
@@ -78,14 +107,23 @@ function ChatPageInner() {
 
         
 
-        <ContactList filter={queueFilter} searchQuery={searchQuery} />
+        <ContactList
+          filter={queueFilter}
+          searchQuery={searchQuery}
+          onConversationOpen={() => setMobileView('chat')}
+        />
       </section>
 
       <section
         id="chat"
-        className="flex-1 h-full bg-card-foreground max-w-screen justify-between max-h-screen flex flex-col overflow-hidden"
+        className={`h-full max-h-screen max-w-screen flex-1 flex-col justify-between overflow-hidden bg-card-foreground ${
+          showMobileChat || !isMobile ? 'flex' : 'hidden'
+        }`}
       >
-        <ChatHeader />
+        <ChatHeader
+          showBackButton={isMobile}
+          onBack={() => setMobileView('list')}
+        />
         <ChatMessages />
         <ChatFooter />
       </section>
