@@ -11,7 +11,7 @@ export default function UserProfile({ online, username }: UserProfileProps) {
   return (
     <div
       id="user-photo"
-      className="w-[52px] h-[52px] bg-background rounded-full relative items-center justify-center flex font-medium text-sm uppercase border-border border-1"
+      className="shrink-0 w-[52px] h-[52px] bg-background rounded-full relative items-center justify-center flex font-medium text-sm uppercase border-border border-1"
     >
       {iniciaisContato || 'US'}
       {online && (

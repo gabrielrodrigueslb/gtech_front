@@ -1,125 +1,65 @@
+// frontend service — não confundir com o whatsapp.service.js do backend
 import { api } from './api'
+import type { WhatsAppConversation, WhatsAppMessage, WhatsAppSession, ConversationsPage } from '@/types/Whatsapp.types'
 
-export type WhatsAppStatus = {
-  instanceId: string
-  status: 'disconnected' | 'connecting' | 'qr' | 'connected' | 'logged_out' | 'error'
-  qrCodeDataUrl: string | null
-  lastError: string | null
-  wid: string | null
-  phoneNumber: string | null
-  displayName: string | null
-  lastSeenAt: string | null
+export async function getWhatsAppSession(): Promise<WhatsAppSession> {
+  const { data } = await api.get('/whatsapp/session')
+  return data
 }
 
-export type WhatsAppConversation = {
-  id: string
-  remoteJid: string
-  isArchived?: boolean
-  phone?: string | null
-  pushName?: string | null
-  waName?: string | null
-  lastMessagePreview?: string | null
-  lastMessageAt?: string | null
-  unreadCount: number
-  assignedUserId?: string | null
-  assignedUser?: { id: string; name: string; email: string } | null
-  contact?: { id: string; name: string; phone?: string | null; email?: string | null; segment?: string | null } | null
-  messages?: Array<{
-    id: string
-    body?: string | null
-    type: string
-    fromMe: boolean
-    timestamp: string
-    senderUserId?: string | null
-  }>
+export async function connectWhatsApp(): Promise<void> {
+  await api.post('/whatsapp/session/connect')
 }
 
-export type WhatsAppMessage = {
-  id: string
-  body?: string | null
-  type: string
-  fromMe: boolean
-  timestamp: string
+export async function logoutWhatsApp(): Promise<void> {
+  await api.post('/whatsapp/session/logout')
+}
+
+export async function getConversations(params?: {
   status?: string
-  senderUserId?: string | null
-  senderUser?: { id: string; name: string; email: string } | null
-}
-
-export async function getWhatsAppStatus() {
-  const { data } = await api.get<WhatsAppStatus>('/whatsapp/status', {
-    params: { _ts: Date.now() },
-  })
-  return data
-}
-
-export async function connectWhatsApp(params?: {
-  resetSession?: boolean
-  mode?: 'reconnect' | 'qr'
-}) {
-  const { data } = await api.post<WhatsAppStatus>('/whatsapp/connect', params || {})
-  return data
-}
-
-export async function disconnectWhatsApp(params?: { resetSession?: boolean }) {
-  const { data } = await api.post<WhatsAppStatus>('/whatsapp/disconnect', params || {})
-  return data
-}
-
-export async function getWhatsAppConversations(params?: {
-  scope?: 'all' | 'mine'
-  search?: string
+  page?: number
   limit?: number
-}) {
-  const { data } = await api.get<WhatsAppConversation[]>('/whatsapp/conversations', {
-    params,
-  })
+  search?: string
+}): Promise<ConversationsPage> {
+  const { data } = await api.get('/whatsapp/conversations', { params })
   return data
 }
 
-export async function getWhatsAppConversationMessages(
+export async function getConversation(id: string): Promise<WhatsAppConversation> {
+  const { data } = await api.get(`/whatsapp/conversations/${id}`)
+  return data
+}
+
+export async function closeConversation(id: string): Promise<WhatsAppConversation> {
+  const { data } = await api.post(`/whatsapp/conversations/${id}/close`)
+  return data
+}
+
+export async function assignConversation(id: string, userId: string): Promise<WhatsAppConversation> {
+  const { data } = await api.post(`/whatsapp/conversations/${id}/assign`, { userId })
+  return data
+}
+
+export async function markConversationAsRead(id: string): Promise<void> {
+  await api.patch(`/whatsapp/conversations/${id}/read`)
+}
+
+export async function getMessages(
   conversationId: string,
-  params?: { limit?: number },
-) {
-  const { data } = await api.get<{
-    conversation: WhatsAppConversation
-    messages: WhatsAppMessage[]
-  }>(`/whatsapp/conversations/${conversationId}/messages`, { params })
+  params?: { cursor?: string; limit?: number }
+): Promise<WhatsAppMessage[]> {
+  const { data } = await api.get(`/whatsapp/conversations/${conversationId}/messages`, { params })
   return data
 }
 
-export async function sendWhatsAppTextMessage(conversationId: string, text: string) {
+export async function sendMessage(
+  conversationId: string,
+  text: string,
+  senderUserId: string
+): Promise<WhatsAppMessage> {
   const { data } = await api.post(`/whatsapp/conversations/${conversationId}/messages`, {
     text,
+    senderUserId,
   })
-  return data
-}
-
-export async function markWhatsAppConversationRead(conversationId: string) {
-  await api.post(`/whatsapp/conversations/${conversationId}/read`)
-}
-
-export async function closeWhatsAppConversation(conversationId: string) {
-  const { data } = await api.post(`/whatsapp/conversations/${conversationId}/close`)
-  return data
-}
-
-export async function assignWhatsAppConversationToMe(conversationId: string) {
-  const { data } = await api.post(`/whatsapp/conversations/${conversationId}/assign/me`)
-  return data
-}
-
-export async function assignWhatsAppConversation(conversationId: string, userId: string | null) {
-  const { data } = await api.post(`/whatsapp/conversations/${conversationId}/assign`, {
-    userId,
-  })
-  return data
-}
-
-export async function startWhatsAppConversation(params: {
-  phone: string
-  name?: string
-  initialMessage?: string
-}) {
-  const { data } = await api.post<WhatsAppConversation>('/whatsapp/conversations/start', params)
   return data
 }
