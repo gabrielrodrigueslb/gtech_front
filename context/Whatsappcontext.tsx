@@ -16,41 +16,47 @@ import {
 } from '@/lib/Whatsapp'
 import type { WhatsAppConversation, WhatsAppMessage } from '@/types/Whatsapp.types'
 
-// ─────────────────────────────────────────
-// TIPOS DO CONTEXT
-// ─────────────────────────────────────────
-
 interface MessagesByConversation {
   [conversationId: string]: WhatsAppMessage[]
 }
 
 interface WhatsAppContextValue {
-  // Conversas
   conversations: WhatsAppConversation[]
   isLoadingConversations: boolean
-
-  // Conversa ativa
   activeConversationId: string | null
   setActiveConversation: (id: string) => void
   activeConversation: WhatsAppConversation | null
-
-  // Mensagens da conversa ativa
   messages: WhatsAppMessage[]
   isLoadingMessages: boolean
-
-  // Ações
-  closeConversation: (id: string) => Promise<void>
+  closeConversation: (id: string, reason: string) => Promise<void>
   addOutgoingMessage: (msg: WhatsAppMessage) => void
-
-  // Socket
   isConnected: boolean
 }
 
-// ─────────────────────────────────────────
-// CONTEXT
-// ─────────────────────────────────────────
-
 const WhatsAppContext = createContext<WhatsAppContextValue | null>(null)
+
+function isConversationVisible(conversation: Partial<WhatsAppConversation> | null | undefined) {
+  return conversation?.status !== 'CLOSED' && conversation?.status !== 'ARCHIVED'
+}
+
+function isSameMessage(a: WhatsAppMessage, b: WhatsAppMessage) {
+  if (a.id && b.id) return a.id === b.id
+  if (a.remoteMessageId && b.remoteMessageId) return a.remoteMessageId === b.remoteMessageId
+  return false
+}
+
+function appendUniqueMessage(messages: WhatsAppMessage[], nextMessage: WhatsAppMessage) {
+  const index = messages.findIndex((message) => isSameMessage(message, nextMessage))
+  if (index === -1) return [...messages, nextMessage]
+
+  const updated = [...messages]
+  updated[index] = { ...updated[index], ...nextMessage }
+  return updated
+}
+
+function dedupeMessages(messages: WhatsAppMessage[]) {
+  return messages.reduce<WhatsAppMessage[]>((acc, message) => appendUniqueMessage(acc, message), [])
+}
 
 export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([])
@@ -63,12 +69,11 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
   const socketRef = useRef<Socket | null>(null)
   const previousConversationRef = useRef<string | null>(null)
 
-  // ── Carregar conversas UMA única vez ────
   useEffect(() => {
     async function loadConversations() {
       try {
         const result = await getConversations({ limit: 50 })
-        setConversations(result.data)
+        setConversations(result.data.filter(isConversationVisible))
       } catch (err) {
         console.error('[WhatsApp] Erro ao carregar conversas:', err)
       } finally {
@@ -79,7 +84,6 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     loadConversations()
   }, [])
 
-  // ── Socket.io — conecta uma única vez ───
   useEffect(() => {
     const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL!, {
       withCredentials: true,
@@ -98,45 +102,45 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       console.log('[Socket] Desconectado')
     })
 
-    // Nova mensagem recebida
     socket.on('whatsapp:new-message', (payload: {
       message: WhatsAppMessage
       conversationId: string
-      conversation: Partial<WhatsAppConversation>
+      conversation?: Partial<WhatsAppConversation>
     }) => {
       const { message, conversationId, conversation } = payload
 
-      // Adiciona a mensagem na lista da conversa
       setMessagesByConversation((prev) => ({
         ...prev,
-        [conversationId]: [...(prev[conversationId] ?? []), message],
+        [conversationId]: appendUniqueMessage(prev[conversationId] ?? [], message),
       }))
 
-      // Atualiza o preview e unreadCount da conversa na lista
       setConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId
             ? {
                 ...c,
-                lastMessagePreview: conversation.lastMessagePreview ?? c.lastMessagePreview,
-                lastMessageAt: conversation.lastMessageAt ?? c.lastMessageAt,
-                unreadCount: conversation.unreadCount ?? c.unreadCount,
+                lastMessagePreview: conversation?.lastMessagePreview ?? message.body ?? c.lastMessagePreview,
+                lastMessageAt: conversation?.lastMessageAt ?? message.timestamp ?? c.lastMessageAt,
+                unreadCount: conversation?.unreadCount ?? c.unreadCount,
               }
             : c
         )
       )
 
-      // Se a conversa ainda não existe na lista (primeira mensagem), adiciona
       setConversations((prev) => {
         const exists = prev.find((c) => c.id === conversationId)
-        if (!exists && conversation) {
-          return [conversation as WhatsAppConversation, ...prev]
+        if (!conversation) return prev
+
+        const nextConversation = conversation as WhatsAppConversation
+
+        if (!exists && isConversationVisible(nextConversation)) {
+          return [nextConversation, ...prev]
         }
+
         return prev
       })
     })
 
-    // Status de mensagem atualizado (sent → delivered → read)
     socket.on('whatsapp:message-status', ({ messageId, status }: { messageId: string; status: string }) => {
       setMessagesByConversation((prev) => {
         const updated = { ...prev }
@@ -149,11 +153,17 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       })
     })
 
-    // Conversa encerrada
     socket.on('whatsapp:conversation-closed', ({ conversationId }: { conversationId: string }) => {
-      setConversations((prev) =>
-        prev.map((c) => (c.id === conversationId ? { ...c, status: 'CLOSED' } : c))
-      )
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId))
+      setMessagesByConversation((prev) => {
+        const updated = { ...prev }
+        delete updated[conversationId]
+        return updated
+      })
+      setActiveConversationId((current) => (current === conversationId ? null : current))
+      if (previousConversationRef.current === conversationId) {
+        previousConversationRef.current = null
+      }
     })
 
     return () => {
@@ -161,10 +171,8 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // ── Trocar conversa ativa ───────────────
   const setActiveConversation = useCallback(
     async (id: string) => {
-      // Sai da sala anterior no socket
       if (previousConversationRef.current) {
         socketRef.current?.emit('leave:conversation', previousConversationRef.current)
       }
@@ -172,23 +180,20 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       setActiveConversationId(id)
       previousConversationRef.current = id
 
-      // Entra na sala da nova conversa
       socketRef.current?.emit('join:conversation', id)
 
-      // Zera unread
       setConversations((prev) =>
         prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
       )
       markConversationAsRead(id).catch(() => {})
 
-      // Carrega mensagens só se ainda não tiver carregado
       if (messagesByConversation[id]) return
 
       setIsLoadingMessages(true)
       try {
         const { getMessages } = await import('@/lib/Whatsapp')
         const msgs = await getMessages(id, { limit: 50 })
-        setMessagesByConversation((prev) => ({ ...prev, [id]: msgs }))
+        setMessagesByConversation((prev) => ({ ...prev, [id]: dedupeMessages(msgs) }))
       } catch (err) {
         console.error('[WhatsApp] Erro ao carregar mensagens:', err)
       } finally {
@@ -198,19 +203,24 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     [messagesByConversation]
   )
 
-  // ── Encerrar conversa ───────────────────
-  const closeConversation = useCallback(async (id: string) => {
-    await closeConversationApi(id)
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: 'CLOSED' } : c))
-    )
+  const closeConversation = useCallback(async (id: string, reason: string) => {
+    await closeConversationApi(id, reason)
+    setConversations((prev) => prev.filter((c) => c.id !== id))
+    setMessagesByConversation((prev) => {
+      const updated = { ...prev }
+      delete updated[id]
+      return updated
+    })
+    setActiveConversationId((current) => (current === id ? null : current))
+    if (previousConversationRef.current === id) {
+      previousConversationRef.current = null
+    }
   }, [])
 
-  // ── Adicionar mensagem enviada pelo próprio usuário ──
   const addOutgoingMessage = useCallback((msg: WhatsAppMessage) => {
     setMessagesByConversation((prev) => ({
       ...prev,
-      [msg.conversationId]: [...(prev[msg.conversationId] ?? []), msg],
+      [msg.conversationId]: appendUniqueMessage(prev[msg.conversationId] ?? [], msg),
     }))
     setConversations((prev) =>
       prev.map((c) =>
@@ -243,10 +253,6 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     </WhatsAppContext.Provider>
   )
 }
-
-// ─────────────────────────────────────────
-// HOOK
-// ─────────────────────────────────────────
 
 export function useWhatsApp() {
   const ctx = useContext(WhatsAppContext)

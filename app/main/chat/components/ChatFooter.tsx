@@ -1,22 +1,44 @@
 'use client'
+
 import { Mic, Plus, SendHorizontal, SmilePlus } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useWhatsApp } from '@/context/Whatsappcontext'
 import { sendMessage } from '@/lib/Whatsapp'
-
-// Troque pelo id do usuário logado — idealmente vem do seu AuthContext
-const CURRENT_USER_ID = process.env.NEXT_PUBLIC_CURRENT_USER_ID ?? ''
+import { getMe } from '@/lib/auth'
 
 export default function ChatFooter() {
   const [text, setText] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const { activeConversationId, addOutgoingMessage } = useWhatsApp()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const hasText = text.trim().length > 0
+  const isInputDisabled = !activeConversationId || isSending || !currentUserId
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadCurrentUser() {
+      try {
+        const me = await getMe()
+        if (!isMounted) return
+        setCurrentUserId(me?.id ?? null)
+      } catch (error) {
+        console.error('[ChatFooter] Erro ao carregar usuario autenticado:', error)
+        if (isMounted) setCurrentUserId(null)
+      }
+    }
+
+    loadCurrentUser()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   async function handleSend() {
-    if (!hasText || !activeConversationId || isSending) return
+    if (!hasText || !activeConversationId || isSending || !currentUserId) return
 
     const textToSend = text.trim()
     setText('')
@@ -24,11 +46,11 @@ export default function ChatFooter() {
 
     setIsSending(true)
     try {
-      const msg = await sendMessage(activeConversationId, textToSend, CURRENT_USER_ID)
+      const msg = await sendMessage(activeConversationId, textToSend, currentUserId)
       addOutgoingMessage(msg)
     } catch (err) {
       console.error('[ChatFooter] Erro ao enviar:', err)
-      setText(textToSend) // devolve o texto se falhar
+      setText(textToSend)
     } finally {
       setIsSending(false)
     }
@@ -58,14 +80,20 @@ export default function ChatFooter() {
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         type="text"
-        disabled={!activeConversationId || isSending}
+        disabled={isInputDisabled}
         className="bg-white/5 rounded-md flex-1 px-6 py-4 text-sm border focus:outline-none disabled:opacity-40"
-        placeholder={activeConversationId ? 'Escreva sua mensagem' : 'Selecione uma conversa'}
+        placeholder={
+          !activeConversationId
+            ? 'Selecione uma conversa'
+            : !currentUserId
+              ? 'Carregando usuario...'
+              : 'Escreva sua mensagem'
+        }
       />
 
       <button
         onClick={handleSend}
-        disabled={!activeConversationId || isSending}
+        disabled={isInputDisabled}
         className="p-1 size-12 flex items-center justify-center rounded-full transition-all cursor-pointer hover:bg-white/20 bg-primary disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {hasText ? <SendHorizontal /> : <Mic />}

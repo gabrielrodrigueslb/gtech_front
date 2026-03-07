@@ -1,6 +1,11 @@
-// frontend service — não confundir com o whatsapp.service.js do backend
+// frontend service -- nao confundir com o whatsapp.service.js do backend
 import { api } from './api'
-import type { WhatsAppConversation, WhatsAppMessage, WhatsAppSession, ConversationsPage } from '@/types/Whatsapp.types'
+import type {
+  ConversationsPage,
+  WhatsAppConversation,
+  WhatsAppMessage,
+  WhatsAppSession,
+} from '@/types/Whatsapp.types'
 
 export async function getWhatsAppSession(): Promise<WhatsAppSession> {
   const { data } = await api.get('/whatsapp/session')
@@ -30,12 +35,18 @@ export async function getConversation(id: string): Promise<WhatsAppConversation>
   return data
 }
 
-export async function closeConversation(id: string): Promise<WhatsAppConversation> {
-  const { data } = await api.post(`/whatsapp/conversations/${id}/close`)
+export async function closeConversation(
+  id: string,
+  reason: string
+): Promise<WhatsAppConversation> {
+  const { data } = await api.post(`/whatsapp/conversations/${id}/close`, { reason })
   return data
 }
 
-export async function assignConversation(id: string, userId: string): Promise<WhatsAppConversation> {
+export async function assignConversation(
+  id: string,
+  userId: string
+): Promise<WhatsAppConversation> {
   const { data } = await api.post(`/whatsapp/conversations/${id}/assign`, { userId })
   return data
 }

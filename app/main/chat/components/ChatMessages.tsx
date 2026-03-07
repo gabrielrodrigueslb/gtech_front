@@ -1,12 +1,29 @@
 'use client'
 
 import { CheckCheck, Clock } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { useWhatsApp } from '@/context/Whatsappcontext'
 import UserProfile from './UserProfile'
 import type { WhatsAppMessage } from '@/types/Whatsapp.types'
 
 export default function ChatMessages() {
   const { messages, isLoadingMessages, activeConversationId } = useWhatsApp()
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const lastConversationRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!activeConversationId || isLoadingMessages || !scrollContainerRef.current) return
+
+    const isConversationChanged = lastConversationRef.current !== activeConversationId
+    const behavior: ScrollBehavior = isConversationChanged ? 'auto' : 'smooth'
+
+    scrollContainerRef.current.scrollTo({
+      top: scrollContainerRef.current.scrollHeight,
+      behavior,
+    })
+
+    lastConversationRef.current = activeConversationId
+  }, [activeConversationId, isLoadingMessages, messages.length])
 
   if (!activeConversationId) {
     return (
@@ -27,7 +44,10 @@ export default function ChatMessages() {
   const groupedMessages = groupByDate(messages)
 
   return (
-    <div className="messages flex-1 overflow-x-hidden overflow-y-auto flex p-6 items-start flex-col gap-3">
+    <div
+      ref={scrollContainerRef}
+      className="messages flex-1 overflow-x-hidden overflow-y-auto flex p-6 items-start flex-col gap-3"
+    >
       {groupedMessages.map(({ label, msgs }) => (
         <div key={label} className="w-full flex flex-col gap-3">
           <span className="py-1 px-4 self-center bg-card rounded-full text-xs font-semibold">
