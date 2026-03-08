@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { useAppShell } from '@/context/app-shell-context'
 import { getMe } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
@@ -50,6 +51,7 @@ function isMenuActive(pathname: string, path: string) {
 }
 
 export default function Sidebar() {
+  const { hideMobileNav } = useAppShell()
   const [user, setUser] = useState<any>(null)
   const [loadingAuth, setLoadingAuth] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -82,6 +84,10 @@ export default function Sidebar() {
 
     checkAuth()
   }, [router])
+
+  useEffect(() => {
+    if (hideMobileNav) setIsMoreSheetOpen(false)
+  }, [hideMobileNav])
 
   const primaryMobileItems = useMemo(
     () => MENU_ITEMS.filter((item) => MOBILE_PRIMARY_PATHS.has(item.path)),
@@ -162,88 +168,90 @@ export default function Sidebar() {
         )}
       </aside>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 md:hidden">
-        <div
-          className="w-full rounded-t-[24px] border-t border-white/10 bg-sidebar-foreground/98 px-2.5 pt-1.5 shadow-[0_-14px_28px_rgba(0,0,0,0.24)] backdrop-blur-xl"
-          style={{ paddingBottom: 'calc(0.65rem + env(safe-area-inset-bottom))' }}
-        >
-          <nav aria-label="Menu principal mobile">
-            <ul className="grid grid-cols-5 items-end gap-0.5">
-              {primaryMobileItems.map((item) => {
-                const Icon = item.icon
-                const isActive = mounted && isMenuActive(pathname, item.path)
-                const isChatItem = item.path === '/main/chat'
+      {!hideMobileNav && (
+        <div className="fixed inset-x-0 bottom-0 z-40 md:hidden">
+          <div
+            className="w-full rounded-t-[24px] border-t border-white/10 bg-sidebar-foreground/98 px-2.5 pt-1.5 shadow-[0_-14px_28px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+            style={{ paddingBottom: 'calc(0.65rem + env(safe-area-inset-bottom))' }}
+          >
+            <nav aria-label="Menu principal mobile">
+              <ul className="grid grid-cols-5 items-end gap-0.5">
+                {primaryMobileItems.map((item) => {
+                  const Icon = item.icon
+                  const isActive = mounted && isMenuActive(pathname, item.path)
+                  const isChatItem = item.path === '/main/chat'
 
-                return (
-                  <li key={item.path} className="flex justify-center">
-                    <Link
-                      href={item.path}
-                      aria-label={item.label}
+                  return (
+                    <li key={item.path} className="flex justify-center">
+                      <Link
+                        href={item.path}
+                        aria-label={item.label}
+                        className={cn(
+                          'flex w-full cursor-pointer flex-col items-center justify-end text-[10px] font-medium transition',
+                          isChatItem ? 'min-h-[64px] gap-0.5' : 'min-h-[54px] gap-1 rounded-2xl px-1.5 py-1.5'
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'flex items-center justify-center transition',
+                            isChatItem
+                              ? cn(
+                                  'mb-0.5 h-[52px] w-[52px] rounded-full border shadow-[0_10px_22px_rgba(0,149,255,0.18)]',
+                                  isActive
+                                    ? 'border-primary/40 bg-sidebar-primary text-white'
+                                    : 'border-white/10 bg-[#1a1b22] text-white/80 hover:bg-white/8'
+                                )
+                              : cn(
+                                  'h-[34px] w-[34px] rounded-2xl',
+                                  isActive
+                                    ? 'bg-sidebar-primary text-white'
+                                    : 'text-white/65 hover:bg-white/5 hover:text-white'
+                                )
+                          )}
+                        >
+                          <Icon className={isChatItem ? 'text-[1.15rem]' : 'text-base'} />
+                        </span>
+                        <span
+                          className={cn(
+                            'truncate',
+                            isActive ? 'text-white' : 'text-white/58',
+                            isChatItem && 'font-semibold'
+                          )}
+                        >
+                          {item.label}
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
+
+                <li className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsMoreSheetOpen(true)}
+                    aria-label="Abrir mais opcoes"
+                    className="flex min-h-[54px] w-full cursor-pointer flex-col items-center justify-end gap-1 rounded-2xl px-1.5 py-1.5 text-[10px] font-medium transition"
+                  >
+                    <span
                       className={cn(
-                        'flex w-full cursor-pointer flex-col items-center justify-end text-[10px] font-medium transition',
-                        isChatItem ? 'min-h-[64px] gap-0.5' : 'min-h-[54px] gap-1 rounded-2xl px-1.5 py-1.5'
+                        'flex h-[34px] w-[34px] items-center justify-center rounded-2xl transition',
+                        isMoreActive || isMoreSheetOpen
+                          ? 'bg-sidebar-primary text-white'
+                          : 'text-white/65 hover:bg-white/5 hover:text-white'
                       )}
                     >
-                      <span
-                        className={cn(
-                          'flex items-center justify-center transition',
-                          isChatItem
-                            ? cn(
-                                'mb-0.5 h-[52px] w-[52px] rounded-full border shadow-[0_10px_22px_rgba(0,149,255,0.18)]',
-                                isActive
-                                  ? 'border-primary/40 bg-sidebar-primary text-white'
-                                  : 'border-white/10 bg-[#1a1b22] text-white/80 hover:bg-white/8'
-                              )
-                            : cn(
-                                'h-[34px] w-[34px] rounded-2xl',
-                                isActive
-                                  ? 'bg-sidebar-primary text-white'
-                                  : 'text-white/65 hover:bg-white/5 hover:text-white'
-                              )
-                        )}
-                      >
-                        <Icon className={isChatItem ? 'text-[1.15rem]' : 'text-base'} />
-                      </span>
-                      <span
-                        className={cn(
-                          'truncate',
-                          isActive ? 'text-white' : 'text-white/58',
-                          isChatItem && 'font-semibold'
-                        )}
-                      >
-                        {item.label}
-                      </span>
-                    </Link>
-                  </li>
-                )
-              })}
-
-              <li className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => setIsMoreSheetOpen(true)}
-                  aria-label="Abrir mais opcoes"
-                  className="flex min-h-[54px] w-full cursor-pointer flex-col items-center justify-end gap-1 rounded-2xl px-1.5 py-1.5 text-[10px] font-medium transition"
-                >
-                  <span
-                    className={cn(
-                      'flex h-[34px] w-[34px] items-center justify-center rounded-2xl transition',
-                      isMoreActive || isMoreSheetOpen
-                        ? 'bg-sidebar-primary text-white'
-                        : 'text-white/65 hover:bg-white/5 hover:text-white'
-                    )}
-                  >
-                    <HiOutlineDotsHorizontal className="text-base" />
-                  </span>
-                  <span className={cn(isMoreActive || isMoreSheetOpen ? 'text-white' : 'text-white/58')}>
-                    Mais
-                  </span>
-                </button>
-              </li>
-            </ul>
-          </nav>
+                      <HiOutlineDotsHorizontal className="text-base" />
+                    </span>
+                    <span className={cn(isMoreActive || isMoreSheetOpen ? 'text-white' : 'text-white/58')}>
+                      Mais
+                    </span>
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </div>
         </div>
-      </div>
+      )}
 
       <Sheet open={isMoreSheetOpen} onOpenChange={setIsMoreSheetOpen}>
         <SheetContent

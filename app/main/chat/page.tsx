@@ -7,6 +7,7 @@ import ChatHeader from './components/ChatHeader';
 import ChatFooter from './components/ChatFooter';
 import ChatMessages from './components/ChatMessages';
 import NewConversationButton from './components/NewConversationButton';
+import { useAppShell } from '@/context/app-shell-context';
 import { WhatsAppProvider, useWhatsApp } from '@/context/Whatsappcontext';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -19,6 +20,7 @@ export default function ChatPage() {
 }
 
 function ChatPageInner() {
+  const { setHideMobileNav } = useAppShell();
   const { conversations, currentUserId, activeConversationId } = useWhatsApp();
   const isMobile = useIsMobile();
   const [queueFilter, setQueueFilter] = useState<'mine' | 'unassigned'>('mine');
@@ -54,6 +56,11 @@ function ChatPageInner() {
 
   const showMobileChat = isMobile && mobileView === 'chat' && !!activeConversationId;
   const showMobileList = !isMobile || mobileView === 'list' || !activeConversationId;
+
+  useEffect(() => {
+    setHideMobileNav(showMobileChat)
+    return () => setHideMobileNav(false)
+  }, [setHideMobileNav, showMobileChat])
 
   return (
     <main className="-mx-4 -mt-4 flex h-[calc(100%+1rem)] w-[calc(100%+2rem)] max-h-screen max-w-none overflow-hidden bg-card md:mx-0 md:mt-0 md:h-full md:w-auto md:max-w-screen md:rounded-2xl">

@@ -11,6 +11,7 @@ import type {
 
 export type OpenConversationInput = {
   phone: string
+  contactId?: string
   name?: string
   initialMessage?: string
 }
