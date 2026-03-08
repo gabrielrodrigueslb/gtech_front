@@ -14,6 +14,7 @@ import { getUsers, getMe } from '@/lib/auth'
 import {
   assignConversation as assignConversationApi,
   closeConversation as closeConversationApi,
+  type CloseConversationScheduleInput,
   getConversations,
   getMessages,
   markConversationAsRead,
@@ -34,6 +35,7 @@ interface MessagesByConversation {
 
 interface WhatsAppContextValue {
   conversations: WhatsAppConversation[]
+  historicalConversations: WhatsAppConversation[]
   isLoadingConversations: boolean
   activeConversationId: string | null
   setActiveConversation: (id: string) => Promise<void>
@@ -42,7 +44,11 @@ interface WhatsAppContextValue {
   getPresenceForConversation: (conversationId?: string | null) => ConversationPresence | null
   messages: WhatsAppMessage[]
   isLoadingMessages: boolean
-  closeConversation: (id: string, reason: string) => Promise<void>
+  closeConversation: (
+    id: string,
+    reason: string,
+    reopenSchedule?: CloseConversationScheduleInput | null
+  ) => Promise<void>
   addOutgoingMessage: (msg: WhatsAppMessage) => void
   registerConversation: (conversation: WhatsAppConversation) => void
   assignConversation: (id: string, userId: string) => Promise<WhatsAppConversation>
@@ -59,6 +65,10 @@ const WhatsAppContext = createContext<WhatsAppContextValue | null>(null)
 
 function isConversationVisible(conversation: Partial<WhatsAppConversation> | null | undefined) {
   return conversation?.status !== 'CLOSED' && conversation?.status !== 'ARCHIVED'
+}
+
+function isHistoricalConversation(conversation: Partial<WhatsAppConversation> | null | undefined) {
+  return conversation?.status === 'CLOSED' || conversation?.status === 'ARCHIVED'
 }
 
 function isSameMessage(a: WhatsAppMessage, b: WhatsAppMessage) {
@@ -92,7 +102,7 @@ function upsertConversationInList(
   conversations: WhatsAppConversation[],
   nextConversation: Partial<WhatsAppConversation>
 ) {
-  if (!isConversationVisible(nextConversation) || !nextConversation.id) return conversations
+  if (!nextConversation.id) return conversations
 
   const existing = conversations.find((conversation) => conversation.id === nextConversation.id)
   if (!existing) {
@@ -117,6 +127,10 @@ function shouldShowConversationForUser(
   return !conversation.assignedUserId || conversation.assignedUserId === currentUserId
 }
 
+function shouldShowHistoricalConversation(conversation: WhatsAppConversation) {
+  return isHistoricalConversation(conversation)
+}
+
 function extractAudioDurationFromMessage(message?: WhatsAppMessage | null) {
   return (
     message?.raw?.message?.audioMessage?.seconds ??
@@ -133,6 +147,7 @@ function getPreviewTextForMessage(message: WhatsAppMessage) {
   if (message.type === 'document') return '[Arquivo]'
   if (message.type === 'sticker') return '[Figurinha]'
   if (message.type === 'reaction') return '[Reacao]'
+  if (message.type === 'system') return '[Historico]'
   return '[Mensagem]'
 }
 
@@ -150,6 +165,22 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
   const socketRef = useRef<Socket | null>(null)
   const previousConversationRef = useRef<string | null>(null)
 
+  const clearActiveConversationSelection = useCallback((conversationId?: string | null) => {
+    const targetConversationId = conversationId ?? previousConversationRef.current
+    if (!targetConversationId) {
+      setActiveConversationId(null)
+      return
+    }
+
+    socketRef.current?.emit('leave:conversation', targetConversationId)
+
+    if (previousConversationRef.current === targetConversationId) {
+      previousConversationRef.current = null
+    }
+
+    setActiveConversationId((current) => (current === targetConversationId ? null : current))
+  }, [])
+
   useEffect(() => {
     let isMounted = true
 
@@ -158,7 +189,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
         const [me, users, result] = await Promise.all([
           getMe(),
           getUsers().catch(() => []),
-          getConversations({ limit: 50 }),
+          getConversations({ limit: 200 }),
         ])
 
         if (!isMounted) return
@@ -170,7 +201,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
             isOnline: prev.find((agent) => agent.id === user.id)?.isOnline ?? false,
           }))
         )
-        setAllConversations(sortConversations(result.data.filter(isConversationVisible)))
+        setAllConversations(sortConversations(result.data))
       } catch (err) {
         console.error('[WhatsApp] Erro ao carregar contexto inicial:', err)
       } finally {
@@ -284,22 +315,25 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     })
 
     socket.on('whatsapp:conversation-closed', ({ conversationId }: { conversationId: string }) => {
-      setAllConversations((prev) => prev.filter((conversation) => conversation.id !== conversationId))
-      setMessagesByConversation((prev) => {
-        const updated = { ...prev }
-        delete updated[conversationId]
-        return updated
-      })
-      setActiveConversationId((current) => (current === conversationId ? null : current))
-      if (previousConversationRef.current === conversationId) {
-        previousConversationRef.current = null
-      }
+      setAllConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                status: 'CLOSED',
+                unreadCount: 0,
+              }
+            : conversation
+        )
+      )
+
+      clearActiveConversationSelection(conversationId)
     })
 
     return () => {
       socket.disconnect()
     }
-  }, [])
+  }, [clearActiveConversationSelection])
 
   useEffect(() => {
     if (!socketRef.current || !currentUserId) return
@@ -315,6 +349,11 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     [allConversations, currentUserId]
   )
 
+  const historicalConversations = useMemo(
+    () => allConversations.filter((conversation) => shouldShowHistoricalConversation(conversation)),
+    [allConversations]
+  )
+
   useEffect(() => {
     if (!socketRef.current || !socketRef.current.connected || conversations.length === 0) return
     socketRef.current.emit(
@@ -327,8 +366,8 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!activeConversationId) return
-    const stillVisible = conversations.some((conversation) => conversation.id === activeConversationId)
-    if (!stillVisible) {
+    const stillExists = allConversations.some((conversation) => conversation.id === activeConversationId)
+    if (!stillExists) {
       if (previousConversationRef.current) {
         socketRef.current?.emit('leave:conversation', previousConversationRef.current)
         previousConversationRef.current = null
@@ -350,7 +389,13 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
       }
 
       const selectedConversation = allConversations.find((conversation) => conversation.id === id)
-      if (selectedConversation && !selectedConversation.assignedUserId && currentUserId) {
+      if (
+        selectedConversation &&
+        selectedConversation.status !== 'CLOSED' &&
+        selectedConversation.status !== 'ARCHIVED' &&
+        !selectedConversation.assignedUserId &&
+        currentUserId
+      ) {
         try {
           await assignConversation(id, currentUserId)
         } catch (error) {
@@ -372,7 +417,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
 
       setIsLoadingMessages(true)
       try {
-        const messages = await getMessages(id, { limit: 50 })
+        const messages = await getMessages(id, { limit: 100 })
         setMessagesByConversation((prev) => ({ ...prev, [id]: dedupeMessages(messages) }))
       } catch (err) {
         console.error('[WhatsApp] Erro ao carregar mensagens:', err)
@@ -383,19 +428,36 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     [allConversations, assignConversation, currentUserId, messagesByConversation]
   )
 
-  const closeConversation = useCallback(async (id: string, reason: string) => {
-    await closeConversationApi(id, reason)
-    setAllConversations((prev) => prev.filter((conversation) => conversation.id !== id))
-    setMessagesByConversation((prev) => {
-      const updated = { ...prev }
-      delete updated[id]
-      return updated
-    })
-    setActiveConversationId((current) => (current === id ? null : current))
-    if (previousConversationRef.current === id) {
-      previousConversationRef.current = null
-    }
-  }, [])
+  const closeConversation = useCallback(
+    async (id: string, reason: string, reopenSchedule?: CloseConversationScheduleInput | null) => {
+      const closedConversation = await closeConversationApi(id, reason, reopenSchedule)
+
+      setAllConversations((prev) =>
+        prev.map((conversation) =>
+          conversation.id === id
+            ? {
+                ...conversation,
+                status: 'CLOSED',
+                unreadCount: 0,
+                closedAt: closedConversation.closedAt ?? new Date().toISOString(),
+                lastCloseReason: closedConversation.lastCloseReason ?? reason,
+                lastClosedByName:
+                  closedConversation.lastClosedByName ?? conversation.lastClosedByName ?? null,
+                scheduledReopenAt: closedConversation.scheduledReopenAt ?? null,
+                scheduledReopenMessage: closedConversation.scheduledReopenMessage ?? null,
+                scheduledReopenSendMessage:
+                  closedConversation.scheduledReopenSendMessage ?? false,
+                scheduledReopenCreatedByName:
+                  closedConversation.scheduledReopenCreatedByName ?? null,
+              }
+            : conversation
+        )
+      )
+
+      clearActiveConversationSelection(id)
+    },
+    [clearActiveConversationSelection]
+  )
 
   const addOutgoingMessage = useCallback(
     (msg: WhatsAppMessage) => {
@@ -444,7 +506,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
   )
 
   const activeConversation =
-    conversations.find((conversation) => conversation.id === activeConversationId) ?? null
+    allConversations.find((conversation) => conversation.id === activeConversationId) ?? null
   const messages = activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : []
 
   const getPresenceForConversation = useCallback(
@@ -463,6 +525,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     <WhatsAppContext.Provider
       value={{
         conversations,
+        historicalConversations,
         isLoadingConversations,
         activeConversationId,
         setActiveConversation,

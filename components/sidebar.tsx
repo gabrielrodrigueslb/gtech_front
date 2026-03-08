@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useAppShell } from '@/context/app-shell-context'
-import { getMe } from '@/lib/auth'
+import { getMe, type AuthMeUser } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -13,7 +13,7 @@ import { FaBuildingUser } from 'react-icons/fa6'
 import { FiSettings } from 'react-icons/fi'
 import { HiOutlineDotsHorizontal } from 'react-icons/hi'
 import type { IconType } from 'react-icons'
-import { LuLayoutDashboard } from 'react-icons/lu'
+import { LuHistory, LuLayoutDashboard } from 'react-icons/lu'
 import { MdLeaderboard } from 'react-icons/md'
 import { TiContacts } from 'react-icons/ti'
 
@@ -46,13 +46,19 @@ const SETTINGS_ITEM: MenuItem = {
   icon: FiSettings,
 }
 
+const HISTORY_ITEM: MenuItem = {
+  path: '/main/historico-chat',
+  label: 'Historico',
+  icon: LuHistory,
+}
+
 function isMenuActive(pathname: string, path: string) {
   return pathname === path || pathname.startsWith(`${path}/`)
 }
 
 export default function Sidebar() {
   const { hideMobileNav } = useAppShell()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<AuthMeUser | null>(null)
   const [loadingAuth, setLoadingAuth] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false)
@@ -94,9 +100,14 @@ export default function Sidebar() {
     []
   )
 
+  const menuItems = useMemo(
+    () => (user?.role === 'ADMIN' ? [...MENU_ITEMS, HISTORY_ITEM] : MENU_ITEMS),
+    [user?.role]
+  )
+
   const moreMobileItems = useMemo(
-    () => [...MENU_ITEMS.filter((item) => !MOBILE_PRIMARY_PATHS.has(item.path)), SETTINGS_ITEM],
-    []
+    () => [...menuItems.filter((item) => !MOBILE_PRIMARY_PATHS.has(item.path)), SETTINGS_ITEM],
+    [menuItems]
   )
 
   const isMoreActive =
@@ -124,7 +135,7 @@ export default function Sidebar() {
 
         <nav className="h-full w-20 p-4">
           <ul className="flex flex-col items-center gap-3">
-            {MENU_ITEMS.map((item) => {
+            {menuItems.map((item) => {
               const Icon = item.icon
               const isActive = mounted && isMenuActive(pathname, item.path)
 

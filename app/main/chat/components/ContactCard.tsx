@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import UserProfile from './UserProfile'
 import { useConversationAvatar } from '@/hooks/useConversationAvatar'
 
@@ -31,14 +31,49 @@ export default function ContactCard({
   status,
   onClick,
 }: ContactProps) {
-  const avatarUrl = useConversationAvatar(conversationId)
+  const containerRef = useRef<HTMLLIElement | null>(null)
+  const [shouldLoadAvatar, setShouldLoadAvatar] = useState(isActive)
+  const avatarUrl = useConversationAvatar(conversationId, {
+    enabled: shouldLoadAvatar || isActive,
+  })
+
+  useEffect(() => {
+    if (isActive) {
+      setShouldLoadAvatar(true)
+      return
+    }
+
+    const element = containerRef.current
+    if (!element || shouldLoadAvatar) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting)
+        if (!isVisible) return
+
+        setShouldLoadAvatar(true)
+        observer.disconnect()
+      },
+      {
+        rootMargin: '180px 0px',
+        threshold: 0.01,
+      }
+    )
+
+    observer.observe(element)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [isActive, shouldLoadAvatar])
 
   return (
     <li
+      ref={containerRef}
       onClick={onClick}
       className={`${isActive ? 'bg-white/10' : ''} w-full flex items-center px-3 py-4 gap-2 hover:bg-white/10 cursor-pointer transition-all`}
     >
-      <UserProfile online={online} username={nomeContato} avatarUrl={avatarUrl} />
+      <UserProfile online={online} username={nomeContato} avatarUrl={avatarUrl} imageLoading="lazy" />
       <div className="flex flex-col flex-1 gap-1 font-light overflow-hidden">
         <span className="flex justify-between items-center">
           <h4 className="font-medium truncate">{nomeContato || 'Contato'}</h4>

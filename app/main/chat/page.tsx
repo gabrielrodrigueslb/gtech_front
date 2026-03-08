@@ -70,6 +70,7 @@ function ChatPageInner() {
           showMobileList ? 'flex' : 'hidden'
         }`}
       >
+        <header className='pb-1 border-b-1 border-border'>
         <div className="mx-3 my-4 grid grid-cols-2 gap-2 ">
           <button
             type="button"
@@ -109,6 +110,8 @@ function ChatPageInner() {
         </div>
         <NewConversationButton />
         </div>
+        </header>
+        
 
         
 

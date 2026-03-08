@@ -4,6 +4,7 @@ interface LoginResponse {
     id: string;
     email: string;
     name: string;
+    role: 'ADMIN' | 'USER';
   };
 }
 
@@ -17,6 +18,14 @@ export interface AuthUserSummary {
   name: string
   email: string
   active: boolean
+  role?: 'ADMIN' | 'USER'
+}
+
+export interface AuthMeUser {
+  id: string
+  name: string
+  email: string
+  role: 'ADMIN' | 'USER'
 }
 
 let meRequestPromise: Promise<any | null> | null = null;
@@ -55,7 +64,7 @@ export async function loginRequest({
   return data;
 }
 
-export async function getMe() {
+export async function getMe(): Promise<AuthMeUser | null> {
   const now = Date.now();
   if (hasMeCache && now - meCacheAt < GET_ME_CACHE_TTL_MS) {
     return meCacheValue;

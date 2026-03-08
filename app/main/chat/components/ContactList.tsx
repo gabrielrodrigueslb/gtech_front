@@ -6,6 +6,7 @@ import {
   FileAudio,
   FileImage,
   FileText,
+  History,
   MessageCircleCode,
   Sticker,
   Video,
@@ -197,6 +198,10 @@ function buildMessagePreview(conversation: WhatsAppConversation) {
 
   if (conversation.lastMessageType === 'reaction') {
     return { text: preview || 'Reacao', icon: <MessageCircleCode size={14} />, highlight: false }
+  }
+
+  if (conversation.lastMessageType === 'system') {
+    return { text: preview || 'Historico do atendimento', icon: <History size={14} />, highlight: false }
   }
 
   return { text: preview, icon: null, highlight: false }

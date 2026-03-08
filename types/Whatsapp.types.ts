@@ -50,6 +50,12 @@ export interface WhatsAppConversation {
   isArchived: boolean
   status: 'PENDING' | 'OPEN' | 'CLOSED' | 'ARCHIVED'
   closedAt?: string | null
+  lastCloseReason?: string | null
+  lastClosedByName?: string | null
+  scheduledReopenAt?: string | null
+  scheduledReopenMessage?: string | null
+  scheduledReopenSendMessage?: boolean
+  scheduledReopenCreatedByName?: string | null
   contactId?: string | null
   assignedUserId?: string | null
   contact?: CRMContact | null
@@ -62,7 +68,7 @@ export interface WhatsAppMessage {
   remoteMessageId?: string | null
   remoteJid: string
   fromMe: boolean
-  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'sticker' | 'reaction' | 'unknown'
+  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'sticker' | 'reaction' | 'system' | 'unknown'
   body?: string | null
   mediaUrl?: string | null
   mediaType?: string | null
@@ -78,4 +84,5 @@ export interface ConversationsPage {
   total: number
   page: number
   limit: number
+  day?: string
 }

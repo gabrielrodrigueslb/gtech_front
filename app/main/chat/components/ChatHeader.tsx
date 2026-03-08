@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftRight, ChevronLeft, EllipsisVertical, MessageSquareX } from 'lucide-react'
+import { ArrowLeftRight, CalendarClock, ChevronLeft, EllipsisVertical, MessageSquareX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import UserProfile from './UserProfile'
 import ConversationDetailsDrawer from './ConversationDetailsDrawer'
@@ -39,6 +39,31 @@ function getConversationPhone(phone?: string | null, remoteJid?: string | null) 
   return phone ?? String(remoteJid ?? '').split('@')[0] ?? ''
 }
 
+function getDefaultScheduleDateTime() {
+  const nextDay = new Date()
+  nextDay.setDate(nextDay.getDate() + 1)
+  nextDay.setHours(9, 0, 0, 0)
+
+  return {
+    date: nextDay.toISOString().slice(0, 10),
+    time: `${String(nextDay.getHours()).padStart(2, '0')}:${String(nextDay.getMinutes()).padStart(2, '0')}`,
+  }
+}
+
+function formatScheduledDateTime(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function ChatHeader({
   showBackButton = false,
   onBack,
@@ -59,6 +84,11 @@ export default function ChatHeader({
   const [closeReason, setCloseReason] = useState(DEFAULT_WHATSAPP_CLOSE_REASONS[0])
   const [isClosing, setIsClosing] = useState(false)
   const [isTransferring, setIsTransferring] = useState(false)
+  const [shouldScheduleReopen, setShouldScheduleReopen] = useState(false)
+  const [scheduledDate, setScheduledDate] = useState('')
+  const [scheduledTime, setScheduledTime] = useState('')
+  const [sendScheduledMessage, setSendScheduledMessage] = useState(false)
+  const [scheduledMessage, setScheduledMessage] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -96,12 +126,19 @@ export default function ChatHeader({
     'Desconhecido'
 
   const isClosed = activeConversation.status === 'CLOSED'
+  const scheduledReopenLabel = formatScheduledDateTime(activeConversation.scheduledReopenAt)
 
   const transferTargets = agents.filter((agent) => agent.isOnline && agent.id !== currentUserId)
 
   function openCloseModal() {
     if (!activeConversation || isClosed) return
+    const defaultSchedule = getDefaultScheduleDateTime()
     setCloseReason(closeReasonOptions[0] ?? DEFAULT_WHATSAPP_CLOSE_REASONS[0])
+    setShouldScheduleReopen(false)
+    setScheduledDate(defaultSchedule.date)
+    setScheduledTime(defaultSchedule.time)
+    setSendScheduledMessage(false)
+    setScheduledMessage('')
     setIsCloseModalOpen(true)
   }
 
@@ -115,9 +152,32 @@ export default function ChatHeader({
     const reason = closeReason.trim()
     if (!reason) return
 
+    const reopenAt =
+      shouldScheduleReopen && scheduledDate && scheduledTime
+        ? new Date(`${scheduledDate}T${scheduledTime}:00`)
+        : null
+
+    if (shouldScheduleReopen && (!reopenAt || Number.isNaN(reopenAt.getTime()) || reopenAt.getTime() <= Date.now())) {
+      return
+    }
+
+    if (shouldScheduleReopen && sendScheduledMessage && !scheduledMessage.trim()) {
+      return
+    }
+
     setIsClosing(true)
     try {
-      await closeConversation(activeConversation.id, reason)
+      await closeConversation(
+        activeConversation.id,
+        reason,
+        shouldScheduleReopen && reopenAt
+          ? {
+              reopenAt: reopenAt.toISOString(),
+              message: sendScheduledMessage ? scheduledMessage.trim() : undefined,
+              sendMessage: sendScheduledMessage,
+            }
+          : null
+      )
       setIsCloseModalOpen(false)
     } finally {
       setIsClosing(false)
@@ -156,6 +216,21 @@ export default function ChatHeader({
             <p className="text-xs opacity-50 truncate">
               {getContactLabel(getConversationPhone(activeConversation.phone, activeConversation.remoteJid))}
             </p>
+            {(isClosed || scheduledReopenLabel) && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {isClosed ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-white/58">
+                    Encerrado
+                  </span>
+                ) : null}
+                {scheduledReopenLabel ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-primary">
+                    <CalendarClock size={12} />
+                    Reabrir {scheduledReopenLabel}
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
         </div>
 
@@ -255,7 +330,7 @@ export default function ChatHeader({
             <div className="space-y-2">
               <h3 className="text-xl font-semibold">Encerrar atendimento</h3>
               <p className="text-sm opacity-70">
-                Informe o motivo do encerramento. O atendimento sera removido da lista de ativos.
+                Informe o motivo do encerramento. Se quiser, ja deixe a reabertura agendada.
               </p>
             </div>
 
@@ -279,6 +354,65 @@ export default function ChatHeader({
                 placeholder="Descreva o motivo do encerramento"
                 className="w-full resize-none rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none"
               />
+
+              <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/4 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={shouldScheduleReopen}
+                  onChange={(event) => setShouldScheduleReopen(event.target.checked)}
+                  className="cursor-pointer"
+                />
+                <div>
+                  <p className="text-sm font-medium">Agendar reabertura</p>
+                  <p className="text-xs text-white/55">
+                    Reabre o atendimento automaticamente em uma data e horario especificos.
+                  </p>
+                </div>
+              </label>
+
+              {shouldScheduleReopen && (
+                <div className="space-y-3 rounded-2xl border border-primary/15 bg-primary/8 p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="date"
+                      value={scheduledDate}
+                      onChange={(event) => setScheduledDate(event.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none cursor-pointer"
+                    />
+                    <input
+                      type="time"
+                      value={scheduledTime}
+                      onChange={(event) => setScheduledTime(event.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none cursor-pointer"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-background/50 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={sendScheduledMessage}
+                      onChange={(event) => setSendScheduledMessage(event.target.checked)}
+                      className="cursor-pointer"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Enviar mensagem quando reabrir</p>
+                      <p className="text-xs text-white/55">
+                        A mensagem sera disparada automaticamente na hora da reabertura.
+                      </p>
+                    </div>
+                  </label>
+
+                  {sendScheduledMessage && (
+                    <textarea
+                      value={scheduledMessage}
+                      onChange={(event) => setScheduledMessage(event.target.value)}
+                      rows={4}
+                      placeholder="Mensagem que sera enviada na reabertura"
+                      className="w-full resize-none rounded-xl border border-white/10 bg-background px-4 py-3 text-sm outline-none"
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
@@ -293,7 +427,15 @@ export default function ChatHeader({
               <button
                 type="button"
                 onClick={handleConfirmClose}
-                disabled={isClosing || !closeReason.trim()}
+                disabled={
+                  isClosing ||
+                  !closeReason.trim() ||
+                  (shouldScheduleReopen &&
+                    (!scheduledDate ||
+                      !scheduledTime ||
+                      new Date(`${scheduledDate}T${scheduledTime}:00`).getTime() <= Date.now() ||
+                      (sendScheduledMessage && !scheduledMessage.trim())))
+                }
                 className="rounded-xl bg-primary px-4 py-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 cursor-pointer"
               >
                 {isClosing ? 'Encerrando...' : 'Encerrar'}

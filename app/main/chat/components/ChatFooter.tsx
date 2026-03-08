@@ -22,21 +22,29 @@ import { getMe } from '@/lib/auth'
 import AudioBars from './AudioBars'
 import ChatAudioPlayer from './ChatAudioPlayer'
 
+const QUICK_EMOJIS = [
+  '😀', '😁', '😂', '🙂', '😉', '😍', '🥰', '😘',
+  '🤔', '😎', '🥳', '🙏', '👏', '💙', '❤️', '🔥',
+  '✨', '🎉', '👍', '👀', '😅', '🤝', '💡', '🚀',
+]
+
 export default function ChatFooter() {
   const [text, setText] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isUploadingMedia, setIsUploadingMedia] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false)
+  const [isEmojiMenuOpen, setIsEmojiMenuOpen] = useState(false)
   const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingLevel, setRecordingLevel] = useState(0)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [mediaError, setMediaError] = useState<string | null>(null)
-  const { activeConversationId, addOutgoingMessage } = useWhatsApp()
+  const { activeConversation, activeConversationId, addOutgoingMessage } = useWhatsApp()
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const composerToolsRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const documentInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
@@ -53,7 +61,11 @@ export default function ChatFooter() {
   const isBusy = isSending || isUploadingMedia
   const hasRecordedAudio = !!recordedAudioBlob && !!recordedAudioUrl
   const isComposerLocked = isRecording || hasRecordedAudio
-  const isInputDisabled = !activeConversationId || isBusy || !currentUserId || isRecording
+  const showComposerTools = !isComposerLocked
+  const isConversationClosed =
+    activeConversation?.status === 'CLOSED' || activeConversation?.status === 'ARCHIVED'
+  const isInputDisabled =
+    !activeConversationId || !activeConversation || isConversationClosed || isBusy || !currentUserId || isRecording
 
   function formatDuration(totalSeconds: number) {
     return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(
@@ -91,6 +103,26 @@ export default function ChatFooter() {
     }
   }, [recordedAudioUrl])
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!(event.target instanceof Node)) return
+      if (!composerToolsRef.current?.contains(event.target)) {
+        setIsAttachmentMenuOpen(false)
+        setIsEmojiMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    if (!showComposerTools) {
+      setIsAttachmentMenuOpen(false)
+      setIsEmojiMenuOpen(false)
+    }
+  }, [showComposerTools])
+
   function stopRecordingStream() {
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop())
     recordingStreamRef.current = null
@@ -127,6 +159,29 @@ export default function ChatFooter() {
     if (shouldFocusInput) {
       window.setTimeout(() => inputRef.current?.focus(), 0)
     }
+  }
+
+  function insertEmoji(emoji: string) {
+    if (isInputDisabled || isComposerLocked) return
+
+    const input = inputRef.current
+    if (!input) {
+      setText((current) => `${current}${emoji}`)
+      return
+    }
+
+    const selectionStart = input.selectionStart ?? text.length
+    const selectionEnd = input.selectionEnd ?? text.length
+    const nextText = `${text.slice(0, selectionStart)}${emoji}${text.slice(selectionEnd)}`
+
+    setText(nextText)
+    setIsEmojiMenuOpen(false)
+
+    window.setTimeout(() => {
+      input.focus()
+      const nextCaretPosition = selectionStart + emoji.length
+      input.setSelectionRange(nextCaretPosition, nextCaretPosition)
+    }, 0)
   }
 
   async function handleSend() {
@@ -409,47 +464,78 @@ export default function ChatFooter() {
       )}
 
       <div className="flex w-full items-center gap-3">
-        <div className="relative flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsAttachmentMenuOpen((current) => !current)}
-            disabled={!activeConversationId || isBusy || isComposerLocked}
-            className="p-1 rounded-sm transition-all cursor-pointer hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Plus />
-          </button>
-          <button
-            type="button"
-            disabled={!activeConversationId || isComposerLocked}
-            className="cursor-pointer rounded-sm p-1 transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <SmilePlus />
-          </button>
+        <div ref={composerToolsRef} className="relative flex h-8 shrink-0 items-center gap-2">
+          {showComposerTools ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEmojiMenuOpen(false)
+                  setIsAttachmentMenuOpen((current) => !current)
+                }}
+                disabled={!activeConversationId || isBusy || isConversationClosed}
+                className="cursor-pointer rounded-sm p-1 transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Plus />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAttachmentMenuOpen(false)
+                  setIsEmojiMenuOpen((current) => !current)
+                }}
+                disabled={!activeConversationId || isConversationClosed}
+                className="cursor-pointer rounded-sm p-1 transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <SmilePlus />
+              </button>
 
-          {isAttachmentMenuOpen && (
-            <div className="absolute bottom-14 left-0 z-30 w-56 rounded-2xl border border-white/10 bg-card p-2 shadow-xl">
-              <button
-                type="button"
-                onClick={() => imageInputRef.current?.click()}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-white/5"
-              >
-                <FileImage size={18} /> Enviar imagem
-              </button>
-              <button
-                type="button"
-                onClick={() => documentInputRef.current?.click()}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-white/5"
-              >
-                <FileText size={18} /> Enviar arquivo
-              </button>
-              <button
-                type="button"
-                onClick={() => audioInputRef.current?.click()}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-white/5"
-              >
-                <FileAudio size={18} /> Enviar audio
-              </button>
-            </div>
+              {isAttachmentMenuOpen && (
+                <div className="absolute bottom-14 left-0 z-30 w-56 rounded-2xl border border-white/10 bg-card p-2 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-white/5"
+                  >
+                    <FileImage size={18} /> Enviar imagem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => documentInputRef.current?.click()}
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-white/5"
+                  >
+                    <FileText size={18} /> Enviar arquivo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => audioInputRef.current?.click()}
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-sm transition hover:bg-white/5"
+                  >
+                    <FileAudio size={18} /> Enviar audio
+                  </button>
+                </div>
+              )}
+
+              {isEmojiMenuOpen && (
+                <div className="absolute bottom-14 left-12 z-30 w-[280px] rounded-2xl border border-white/10 bg-card p-3 shadow-xl">
+                  <p className="px-1 pb-2 text-xs uppercase tracking-[0.16em] text-white/45">Emojis</p>
+                  <div className="grid grid-cols-8 gap-1">
+                    {QUICK_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => insertEmoji(emoji)}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-lg transition hover:bg-white/8"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="w-[52px] shrink-0" aria-hidden="true" />
           )}
         </div>
 
@@ -499,6 +585,8 @@ export default function ChatFooter() {
               placeholder={
                 !activeConversationId
                   ? 'Selecione uma conversa'
+                  : isConversationClosed
+                    ? 'Atendimento encerrado. Historico em modo leitura'
                   : !currentUserId
                     ? 'Carregando usuario...'
                     : 'Escreva sua mensagem'
@@ -509,55 +597,39 @@ export default function ChatFooter() {
 
         <div className="flex shrink-0 items-center justify-end gap-2 ">
           {isRecording ? (
-            <>
-              <button
-                type="button"
-                onClick={() => clearRecordedAudio()}
-                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/5 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
-                title="Cancelar gravacao"
-              >
-                <Trash2 size={18} />
-                <span className="hidden sm:inline">Cancelar</span>
-              </button>
-              <button
-                type="button"
-                onClick={stopRecording}
-                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-white transition hover:opacity-90 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
-                title="Finalizar gravacao"
-              >
-                <Square size={18} />
-                <span className="hidden sm:inline">Finalizar</span>
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-white transition hover:opacity-90"
+              title="Finalizar gravacao"
+            >
+              <Square size={18} />
+            </button>
           ) : hasRecordedAudio ? (
             <>
               <button
                 type="button"
                 onClick={() => clearRecordedAudio()}
-                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/5 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
+                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/5"
                 title="Excluir audio"
               >
                 <Trash2 size={18} />
-                <span className="hidden sm:inline">Excluir</span>
               </button>
               <button
                 type="button"
                 onClick={handleSendRecordedAudio}
                 disabled={isUploadingMedia}
-                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:h-auto sm:w-auto sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3"
+                className="inline-flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 title="Enviar audio"
               >
                 <SendHorizontal size={18} />
-                <span className="hidden sm:inline">
-                  {isUploadingMedia ? 'Enviando...' : 'Enviar'}
-                </span>
               </button>
             </>
           ) : (
             <button
               type="button"
               onClick={handlePrimaryAction}
-              disabled={!activeConversationId || isBusy || !currentUserId}
+              disabled={!activeConversationId || isBusy || !currentUserId || isConversationClosed}
               className="flex size-12 cursor-pointer items-center justify-center rounded-full bg-primary p-1 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {hasText ? <SendHorizontal /> : <Mic />}

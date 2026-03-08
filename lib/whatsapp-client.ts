@@ -43,6 +43,12 @@ export type SaveConversationContactInput = {
   tags?: string[]
 }
 
+export type CloseConversationScheduleInput = {
+  reopenAt: string
+  message?: string
+  sendMessage?: boolean
+}
+
 export const DEFAULT_WHATSAPP_CLOSE_REASONS = [
   'Atendimento concluido',
   'Cliente nao respondeu',
@@ -70,8 +76,19 @@ export async function getConversations(params?: {
   page?: number
   limit?: number
   search?: string
+  day?: string
 }): Promise<ConversationsPage> {
   const { data } = await api.get('/whatsapp/conversations', { params })
+  return data
+}
+
+export async function getHistoricalConversations(params?: {
+  page?: number
+  limit?: number
+  search?: string
+  day?: string
+}): Promise<ConversationsPage> {
+  const { data } = await api.get('/whatsapp/conversations/history', { params })
   return data
 }
 
@@ -133,9 +150,13 @@ export async function deleteContactTag(tag: string): Promise<string[]> {
 
 export async function closeConversation(
   id: string,
-  reason: string
+  reason: string,
+  reopenSchedule?: CloseConversationScheduleInput | null
 ): Promise<WhatsAppConversation> {
-  const { data } = await api.post(`/whatsapp/conversations/${id}/close`, { reason })
+  const { data } = await api.post(`/whatsapp/conversations/${id}/close`, {
+    reason,
+    reopenSchedule: reopenSchedule ?? null,
+  })
   return data
 }
 

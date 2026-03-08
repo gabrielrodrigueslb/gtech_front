@@ -4,6 +4,7 @@ interface UserProfileProps {
   avatarUrl?: string | null
   username: string
   className?: string
+  imageLoading?: 'eager' | 'lazy'
 }
 
 function getInitials(username: string) {
@@ -22,6 +23,7 @@ export default function UserProfile({
   avatarUrl,
   username,
   className = '',
+  imageLoading = 'eager',
 }: UserProfileProps) {
   const iniciaisContato = getInitials(username).toUpperCase()
   return (
@@ -35,6 +37,8 @@ export default function UserProfile({
           alt={username}
           className="h-full w-full object-cover"
           referrerPolicy="no-referrer"
+          loading={imageLoading}
+          decoding="async"
         />
       ) : (
         iniciaisContato

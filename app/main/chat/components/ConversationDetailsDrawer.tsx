@@ -73,6 +73,20 @@ function formatPhone(value?: string | null) {
   return digits
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function getPresenceLabel(_presence: ConversationPresence | null, fallbackPhone?: string | null) {
   return formatPhone(fallbackPhone)
 }
@@ -182,6 +196,8 @@ export default function ConversationDetailsDrawer({
     .split(',')
     .map((tag) => tag.trim())
     .filter(Boolean)
+  const closedAtLabel = formatDateTime(conversation.closedAt)
+  const scheduledReopenLabel = formatDateTime(conversation.scheduledReopenAt)
 
   function toggleTag(tag: string) {
     const nextTags = tagList.includes(tag)
@@ -437,8 +453,26 @@ export default function ConversationDetailsDrawer({
                   <div className="grid grid-cols-2 gap-3">
                     <DataCard label="Responsavel" value={conversation.assignedUser?.name ?? 'Nao atribuido'} />
                     <DataCard label="Status CRM" value={formData.status || 'lead'} />
+                    <DataCard label="Status chat" value={conversation.status === 'CLOSED' ? 'Encerrado' : 'Ativo'} />
+                    <DataCard label="Encerrado por" value={conversation.lastClosedByName ?? 'Nao informado'} />
+                    <DataCard label="Data de encerramento" value={closedAtLabel ?? 'Nao encerrado'} />
+                    <DataCard label="Reabertura agendada" value={scheduledReopenLabel ?? 'Nao agendada'} />
                   </div>
                 </Section>
+
+                <Section title="Motivo do encerramento">
+                  <div className="rounded-3xl border border-white/10 bg-white/3 px-4 py-5 text-sm leading-6 text-white/72">
+                    {conversation.lastCloseReason || 'Nenhum motivo registrado ate o momento.'}
+                  </div>
+                </Section>
+
+                {conversation.scheduledReopenSendMessage && conversation.scheduledReopenMessage ? (
+                  <Section title="Mensagem de reabertura">
+                    <div className="rounded-3xl border border-primary/15 bg-primary/8 px-4 py-5 text-sm leading-6 text-white/78">
+                      {conversation.scheduledReopenMessage}
+                    </div>
+                  </Section>
+                ) : null}
 
                 <Section title="Tags do cliente">
                   {tagList.length > 0 ? (
