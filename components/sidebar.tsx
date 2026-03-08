@@ -2,15 +2,16 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import LogoutConfirmDialog from '@/components/logout-confirm-dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useAppShell } from '@/context/app-shell-context'
 import { getMe, type AuthMeUser } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FaRegNewspaper, FaTasks, FaWhatsapp } from 'react-icons/fa'
 import { FaBuildingUser } from 'react-icons/fa6'
-import { FiSettings } from 'react-icons/fi'
+import { FiLogOut, FiSettings } from 'react-icons/fi'
 import { HiOutlineDotsHorizontal } from 'react-icons/hi'
 import type { IconType } from 'react-icons'
 import { LuHistory, LuLayoutDashboard } from 'react-icons/lu'
@@ -62,9 +63,13 @@ export default function Sidebar() {
   const [loadingAuth, setLoadingAuth] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const pathname = usePathname()
   const router = useRouter()
+  const userMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -95,6 +100,24 @@ export default function Sidebar() {
     if (hideMobileNav) setIsMoreSheetOpen(false)
   }, [hideMobileNav])
 
+  useEffect(() => {
+    setIsUserMenuOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!userMenuRef.current?.contains(event.target as Node)) {
+        setIsUserMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+    }
+  }, [])
+
   const primaryMobileItems = useMemo(
     () => MENU_ITEMS.filter((item) => MOBILE_PRIMARY_PATHS.has(item.path)),
     []
@@ -114,12 +137,29 @@ export default function Sidebar() {
     mounted && moreMobileItems.some((item) => isMenuActive(pathname, item.path))
 
   function openSettings() {
+    setIsUserMenuOpen(false)
     router.push('/main/configuracoes')
   }
 
   function navigateTo(path: string) {
     setIsMoreSheetOpen(false)
     router.push(path)
+  }
+
+  async function handleLogout() {
+    try {
+      setIsLoggingOut(true)
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      setIsLogoutDialogOpen(false)
+      router.replace('/')
+    } finally {
+      setIsLoggingOut(false)
+      setIsUserMenuOpen(false)
+    }
   }
 
   return (
@@ -159,22 +199,59 @@ export default function Sidebar() {
         </nav>
 
         {!loadingAuth && user && (
-          <div className="user-infos flex items-center gap-4 px-4">
+          <div ref={userMenuRef} className="user-infos relative flex items-center gap-4 px-4">
             <button
               type="button"
-              title="Abrir configuracoes"
-              aria-label="Abrir configuracoes"
+              title="Abrir menu do usuario"
+              aria-label="Abrir menu do usuario"
+              aria-expanded={isUserMenuOpen}
               className={`relative h-12 w-12 cursor-pointer rounded-full transition-all ${
-                mounted && pathname === '/main/configuracoes'
+                mounted && (pathname === '/main/configuracoes' || isUserMenuOpen)
                   ? 'bg-sidebar-primary text-white ring-2 ring-sidebar-primary/30'
                   : 'bg-amber-400 text-black hover:scale-105'
               }`}
-              onClick={openSettings}
+              onClick={() => setIsUserMenuOpen((current) => !current)}
             >
               <span className="flex h-full items-center justify-center font-bold">
                 {user.name?.[0]}
               </span>
             </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute bottom-0 left-full z-30 ml-3 w-52 overflow-hidden rounded-3xl border border-white/10 bg-[#16181d] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                <div className="border-b border-white/8 px-3 pb-3 pt-2">
+                  <p className="truncate text-sm font-semibold text-white">{user.name ?? 'Usuario'}</p>
+                  <p className="truncate text-xs text-white/45">{user.email ?? ''}</p>
+                </div>
+
+                <div className="mt-2 grid gap-1">
+                  <button
+                    type="button"
+                    onClick={openSettings}
+                    className="flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-white/82 transition hover:bg-white/6"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/6 text-base text-white/75">
+                      <FiSettings />
+                    </span>
+                    <span>Configuracoes</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false)
+                      setIsLogoutDialogOpen(true)
+                    }}
+                    className="flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-rose-100 transition hover:bg-rose-500/12"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-500/12 text-base text-rose-200">
+                      <FiLogOut />
+                    </span>
+                    <span>Sair</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </aside>
@@ -323,6 +400,13 @@ export default function Sidebar() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <LogoutConfirmDialog
+        open={isLogoutDialogOpen}
+        onOpenChange={setIsLogoutDialogOpen}
+        onConfirm={handleLogout}
+        isLoading={isLoggingOut}
+      />
     </>
   )
 }

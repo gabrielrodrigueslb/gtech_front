@@ -1,6 +1,7 @@
 'use client';
 
 import { getMe } from '@/lib/auth';
+import LogoutConfirmDialog from '@/components/logout-confirm-dialog';
 import {
   connectWhatsApp,
   createContactTag,
@@ -92,6 +93,7 @@ export default function ConfiguracoesPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [closeReasons, setCloseReasons] = useState<string[]>(DEFAULT_WHATSAPP_CLOSE_REASONS);
   const [newCloseReason, setNewCloseReason] = useState('');
@@ -297,6 +299,7 @@ export default function ConfiguracoesPage() {
         method: 'POST',
         credentials: 'include',
       });
+      setIsLogoutDialogOpen(false);
       router.replace('/');
     } finally {
       setIsLoggingOut(false);
@@ -432,7 +435,14 @@ export default function ConfiguracoesPage() {
           handleRemoveContactTag={handleRemoveContactTag}
           handleConnect={handleConnect}
           handleDisconnect={handleDisconnect}
-          handleLogout={handleLogout}
+          openLogoutDialog={() => setIsLogoutDialogOpen(true)}
+        />
+
+        <LogoutConfirmDialog
+          open={isLogoutDialogOpen}
+          onOpenChange={setIsLogoutDialogOpen}
+          onConfirm={handleLogout}
+          isLoading={isLoggingOut}
         />
 
         {false && (
@@ -773,7 +783,7 @@ type SettingsTabbedSectionsProps = {
   handleRemoveContactTag: (tag: string) => Promise<void>;
   handleConnect: () => Promise<void>;
   handleDisconnect: () => Promise<void>;
-  handleLogout: () => Promise<void>;
+  openLogoutDialog: () => void;
 };
 
 function SettingsTabbedSections({
@@ -804,7 +814,7 @@ function SettingsTabbedSections({
   handleRemoveContactTag,
   handleConnect,
   handleDisconnect,
-  handleLogout,
+  openLogoutDialog,
 }: SettingsTabbedSectionsProps) {
   const userInitials = user?.name?.slice(0, 2)?.toUpperCase() ?? 'US';
 
@@ -892,7 +902,7 @@ function SettingsTabbedSections({
 
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={openLogoutDialog}
                     disabled={isLoggingOut}
                     className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                   >
