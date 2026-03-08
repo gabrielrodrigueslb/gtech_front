@@ -18,6 +18,8 @@ import {
   getConversations,
   getMessages,
   markConversationAsRead,
+  routeConversationToAi as routeConversationToAiApi,
+  returnConversationToQueue as returnConversationToQueueApi,
   saveConversationContact as saveConversationContactApi,
   type SaveConversationContactInput,
 } from '@/lib/whatsapp-client'
@@ -52,6 +54,8 @@ interface WhatsAppContextValue {
   addOutgoingMessage: (msg: WhatsAppMessage) => void
   registerConversation: (conversation: WhatsAppConversation) => void
   assignConversation: (id: string, userId: string) => Promise<WhatsAppConversation>
+  returnConversationToQueue: (id: string) => Promise<WhatsAppConversation>
+  routeConversationToAi: (id: string) => Promise<WhatsAppConversation>
   saveConversationContact: (
     id: string,
     payload: SaveConversationContactInput
@@ -120,11 +124,10 @@ function upsertConversationInList(
 
 function shouldShowConversationForUser(
   conversation: WhatsAppConversation,
-  currentUserId: string | null
+  _currentUserId: string | null
 ) {
   if (!isConversationVisible(conversation)) return false
-  if (!currentUserId) return true
-  return !conversation.assignedUserId || conversation.assignedUserId === currentUserId
+  return true
 }
 
 function shouldShowHistoricalConversation(conversation: WhatsAppConversation) {
@@ -278,6 +281,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
                   unreadCount: conversation?.unreadCount ?? conversationItem.unreadCount,
                   assignedUserId: conversation?.assignedUserId ?? conversationItem.assignedUserId,
                   assignedUser: conversation?.assignedUser ?? conversationItem.assignedUser,
+                  routing: conversation?.routing ?? conversationItem.routing,
                   lastMessageType: conversation?.lastMessageType ?? message.type ?? conversationItem.lastMessageType,
                   lastMessageDurationSeconds:
                     conversation?.lastMessageDurationSeconds ??
@@ -382,25 +386,22 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
     return conversation
   }, [])
 
+  const returnConversationToQueue = useCallback(async (id: string) => {
+    const conversation = await returnConversationToQueueApi(id)
+    setAllConversations((prev) => upsertConversationInList(prev, conversation))
+    return conversation
+  }, [])
+
+  const routeConversationToAi = useCallback(async (id: string) => {
+    const conversation = await routeConversationToAiApi(id)
+    setAllConversations((prev) => upsertConversationInList(prev, conversation))
+    return conversation
+  }, [])
+
   const setActiveConversation = useCallback(
     async (id: string) => {
       if (previousConversationRef.current) {
         socketRef.current?.emit('leave:conversation', previousConversationRef.current)
-      }
-
-      const selectedConversation = allConversations.find((conversation) => conversation.id === id)
-      if (
-        selectedConversation &&
-        selectedConversation.status !== 'CLOSED' &&
-        selectedConversation.status !== 'ARCHIVED' &&
-        !selectedConversation.assignedUserId &&
-        currentUserId
-      ) {
-        try {
-          await assignConversation(id, currentUserId)
-        } catch (error) {
-          console.error('[WhatsApp] Erro ao assumir atendimento:', error)
-        }
       }
 
       setActiveConversationId(id)
@@ -425,7 +426,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
         setIsLoadingMessages(false)
       }
     },
-    [allConversations, assignConversation, currentUserId, messagesByConversation]
+    [messagesByConversation]
   )
 
   const closeConversation = useCallback(
@@ -538,6 +539,8 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
         addOutgoingMessage,
         registerConversation,
         assignConversation,
+        returnConversationToQueue,
+        routeConversationToAi,
         saveConversationContact,
         agents,
         currentUserId,

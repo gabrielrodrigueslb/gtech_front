@@ -77,9 +77,6 @@ export async function getMe(): Promise<AuthMeUser | null> {
   meRequestPromise = (async () => {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
       credentials: 'include',
-      headers: {
-        'x-api-key': `${process.env.NEXT_PUBLIC_API_KEY}`,
-      },
     });
 
     if (!res.ok) {
@@ -104,9 +101,6 @@ export async function getMe(): Promise<AuthMeUser | null> {
 export async function getUsers(): Promise<AuthUserSummary[]> {
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, {
     credentials: 'include',
-    headers: {
-      'x-api-key': `${process.env.NEXT_PUBLIC_API_KEY}`,
-    },
   })
 
   if (!res.ok) {

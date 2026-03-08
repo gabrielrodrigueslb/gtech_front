@@ -8,6 +8,6 @@ export interface User {
 
 // Busca todos os usuários para preencher o select de responsáveis
 export async function getUsers() {
-  const { data } = await api.get('/user/getUsers');
+  const { data } = await api.get('/auth/users');
   return data;
 }

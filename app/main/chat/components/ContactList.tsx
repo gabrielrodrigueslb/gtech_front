@@ -14,7 +14,7 @@ import {
 import type { WhatsAppConversation } from '@/types/Whatsapp.types'
 
 type ContactListProps = {
-  filter: 'mine' | 'unassigned'
+  filter: 'mine' | 'queue' | 'open'
   searchQuery?: string
   onConversationOpen?: () => void
 }
@@ -52,8 +52,11 @@ export default function ContactList({
     () =>
       conversations.filter((conversation) => {
         const matchesQueue =
-          filter === 'unassigned'
-            ? !conversation.assignedUserId
+          filter === 'queue'
+            ? (conversation.routing?.ownerType ?? (conversation.assignedUserId ? 'user' : 'queue')) ===
+                'queue' && !conversation.assignedUserId
+            : filter === 'open'
+              ? true
             : conversation.assignedUserId === currentUserId
 
         if (!matchesQueue) return false
@@ -114,8 +117,10 @@ export default function ContactList({
       <div className="flex-1 flex items-center justify-center text-sm opacity-40 p-6 text-center">
         {searchQuery.trim()
           ? 'Nenhum atendimento encontrado para essa busca'
-          : filter === 'unassigned'
-            ? 'Nenhum atendimento aguardando atribuicao'
+          : filter === 'queue'
+            ? 'Nenhum atendimento aguardando na fila'
+            : filter === 'open'
+              ? 'Nenhum atendimento aberto no momento'
             : 'Nenhum atendimento atribuido a voce'}
       </div>
     )
@@ -125,6 +130,17 @@ export default function ContactList({
     <ul className="flex-col flex w-full h-full overflow-y-auto">
       {filteredConversations.map((conv) => {
         const preview = buildMessagePreview(conv)
+        const ownerType = conv.routing?.ownerType ?? (conv.assignedUserId ? 'user' : 'queue')
+        const showOwnership = filter === 'open'
+        const ownerLabel = !showOwnership
+          ? ''
+          : ownerType === 'ai_agent'
+            ? 'Com IA'
+            : ownerType === 'queue'
+              ? 'Na fila'
+              : conv.assignedUser?.name
+                ? `Com ${conv.assignedUser.name}`
+                : 'Com atendente'
 
         return (
           <ContactCard
@@ -140,6 +156,9 @@ export default function ContactList({
             noRead={conv.unreadCount > 0}
             unreadCount={conv.unreadCount}
             status={conv.status}
+            routingOwnerType={ownerType}
+            ownerLabel={ownerLabel}
+            showOwnership={showOwnership}
             onClick={() => {
               onConversationOpen?.()
               void setActiveConversation(conv.id)

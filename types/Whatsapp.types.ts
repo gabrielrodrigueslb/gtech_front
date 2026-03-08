@@ -34,6 +34,160 @@ export interface WhatsAppSession {
   lastError?: string | null
 }
 
+export interface WhatsAppAiProviderSettings {
+  apiKey: string
+  model: string
+  clearApiKey?: boolean
+}
+
+export interface WhatsAppAiProviderSettingsUpdateInput {
+  model: string
+  clearApiKey?: boolean
+  encryptedApiKey?: string
+}
+
+export interface WhatsAppAiAgentCredentialsSummary {
+  openai: {
+    hasApiKey: boolean
+    usesStoredApiKey: boolean
+  }
+  gemini: {
+    hasApiKey: boolean
+    usesStoredApiKey: boolean
+  }
+}
+
+export interface WhatsAppAiAgentRuntimeSummary {
+  activeProvider: 'openai' | 'gemini'
+  activeModel: string
+  hasActiveApiKey: boolean
+  canGenerateReply: boolean
+  blockingReasons: string[]
+  responseDelayMs: number
+  responseDelayLabel: string
+}
+
+export interface WhatsAppAiAgentConfig {
+  enabled: boolean
+  provider: 'openai' | 'gemini'
+  agentName: string
+  onlyUnassignedConversations: boolean
+  replyToGroups: boolean
+  responseDelayMs: number
+  maxContextMessages: number
+  temperature: number
+  systemPrompt: string
+  openai: WhatsAppAiProviderSettings
+  gemini: WhatsAppAiProviderSettings
+  credentials?: WhatsAppAiAgentCredentialsSummary
+  runtime?: WhatsAppAiAgentRuntimeSummary
+}
+
+export interface WhatsAppAiAgentConfigUpdateInput {
+  enabled: boolean
+  provider: 'openai' | 'gemini'
+  agentName: string
+  onlyUnassignedConversations: boolean
+  replyToGroups: boolean
+  responseDelayMs: number
+  maxContextMessages: number
+  temperature: number
+  systemPrompt: string
+  openai: WhatsAppAiProviderSettingsUpdateInput
+  gemini: WhatsAppAiProviderSettingsUpdateInput
+}
+
+export interface WhatsAppAiKnowledgeItem {
+  id: string
+  title: string
+  content: string
+  sourceType: 'manual' | 'file'
+  fileName?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
+  enabled: boolean
+  alwaysInclude: boolean
+  createdAt: string
+  updatedAt: string
+  contentPreview?: string
+  contentLength?: number
+}
+
+export interface WhatsAppAiKnowledgeManualCreateInput {
+  title: string
+  content: string
+  alwaysInclude?: boolean
+}
+
+export interface WhatsAppAiKnowledgeFileCreateInput {
+  title?: string
+  fileName: string
+  dataUrl: string
+  alwaysInclude?: boolean
+}
+
+export interface WhatsAppAiKnowledgeUpdateInput {
+  title: string
+  content: string
+  enabled: boolean
+  alwaysInclude: boolean
+}
+
+export type WhatsAppConversationRoutingOwnerType = 'queue' | 'user' | 'ai_agent'
+
+export type WhatsAppHumanHandoffStrategy =
+  | 'manual_queue'
+  | 'online_round_robin'
+  | 'online_random'
+
+export interface WhatsAppConversationRouting {
+  ownerType: WhatsAppConversationRoutingOwnerType
+  ownerId?: string | null
+  source?:
+    | 'new_conversation'
+    | 'queue_transfer'
+    | 'manual_assign'
+    | 'manual_ai'
+    | 'ai_handoff'
+    | 'system'
+    | string
+  humanHandoffStrategy?: WhatsAppHumanHandoffStrategy
+  updatedAt?: string | null
+}
+
+export interface WhatsAppDistributionNewConversationsConfig {
+  strategy: 'manual_queue' | 'online_round_robin'
+  passThroughAiFirst: boolean
+}
+
+export interface WhatsAppDistributionQueueTransfersConfig {
+  strategy: 'manual_queue' | 'online_round_robin' | 'online_random'
+  passThroughAiFirst: boolean
+}
+
+export interface WhatsAppDistributionRuntimeSummary {
+  newConversations: {
+    strategy: WhatsAppDistributionNewConversationsConfig['strategy']
+    passThroughAiFirst: boolean
+  }
+  queueTransfers: {
+    strategy: WhatsAppDistributionQueueTransfersConfig['strategy']
+    passThroughAiFirst: boolean
+  }
+  aiHandoff: {
+    enabled: boolean
+  }
+}
+
+export interface WhatsAppDistributionConfig {
+  newConversations: WhatsAppDistributionNewConversationsConfig
+  queueTransfers: WhatsAppDistributionQueueTransfersConfig
+  aiHandoff: {
+    enabled: boolean
+  }
+  runtime?: WhatsAppDistributionRuntimeSummary
+}
+
 export interface WhatsAppConversation {
   id: string
   instanceKey: string
@@ -60,6 +214,7 @@ export interface WhatsAppConversation {
   assignedUserId?: string | null
   contact?: CRMContact | null
   assignedUser?: { id: string; name: string } | null
+  routing?: WhatsAppConversationRouting | null
 }
 
 export interface WhatsAppMessage {

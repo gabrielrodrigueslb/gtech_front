@@ -64,6 +64,21 @@ function formatScheduledDateTime(value?: string | null) {
   })
 }
 
+function extractActionErrorMessage(error: unknown, fallback: string) {
+  const typedError = error as {
+    response?: { data?: { error?: string; message?: string; details?: string } }
+    message?: string
+  } | null
+
+  return (
+    typedError?.response?.data?.error ??
+    typedError?.response?.data?.message ??
+    typedError?.response?.data?.details ??
+    typedError?.message ??
+    fallback
+  )
+}
+
 export default function ChatHeader({
   showBackButton = false,
   onBack,
@@ -72,6 +87,8 @@ export default function ChatHeader({
     activeConversation,
     closeConversation,
     assignConversation,
+    routeConversationToAi,
+    returnConversationToQueue,
     saveConversationContact,
     agents,
     currentUserId,
@@ -84,6 +101,8 @@ export default function ChatHeader({
   const [closeReason, setCloseReason] = useState(DEFAULT_WHATSAPP_CLOSE_REASONS[0])
   const [isClosing, setIsClosing] = useState(false)
   const [isTransferring, setIsTransferring] = useState(false)
+  const [isAssuming, setIsAssuming] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [shouldScheduleReopen, setShouldScheduleReopen] = useState(false)
   const [scheduledDate, setScheduledDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('')
@@ -126,6 +145,19 @@ export default function ChatHeader({
     'Desconhecido'
 
   const isClosed = activeConversation.status === 'CLOSED'
+  const routingOwnerType =
+    activeConversation.routing?.ownerType ??
+    (activeConversation.assignedUserId ? 'user' : 'queue')
+  const isWaitingInQueue = routingOwnerType === 'queue' && !activeConversation.assignedUserId
+  const isAiOwned = routingOwnerType === 'ai_agent' && !activeConversation.assignedUserId
+  const isAssignedToAnotherUser = Boolean(
+    activeConversation.assignedUserId &&
+      currentUserId &&
+      activeConversation.assignedUserId !== currentUserId
+  )
+  const canAssumeConversation = Boolean(
+    currentUserId && !isClosed && !activeConversation.assignedUserId && (isWaitingInQueue || isAiOwned)
+  )
   const scheduledReopenLabel = formatScheduledDateTime(activeConversation.scheduledReopenAt)
 
   const transferTargets = agents.filter((agent) => agent.isOnline && agent.id !== currentUserId)
@@ -185,14 +217,65 @@ export default function ChatHeader({
   }
 
   async function handleTransfer(userId: string) {
-    if (!activeConversation || !userId) return
+    if (!activeConversation || !userId || isClosed) return
 
     setIsTransferring(true)
+    setActionError(null)
     try {
       await assignConversation(activeConversation.id, userId)
       setIsTransferModalOpen(false)
+    } catch (error) {
+      setActionError(extractActionErrorMessage(error, 'Nao foi possivel transferir o atendimento.'))
     } finally {
       setIsTransferring(false)
+    }
+  }
+
+  async function handleReturnToQueue() {
+    if (!activeConversation || !activeConversation.assignedUserId || isClosed) return
+
+    setIsTransferring(true)
+    setActionError(null)
+    try {
+      await returnConversationToQueue(activeConversation.id)
+      setIsTransferModalOpen(false)
+    } catch (error) {
+      setActionError(
+        extractActionErrorMessage(error, 'Nao foi possivel devolver o atendimento para a fila.')
+      )
+    } finally {
+      setIsTransferring(false)
+    }
+  }
+
+  async function handleRouteToAi() {
+    if (!activeConversation || isClosed || isAiOwned) return
+
+    setIsTransferring(true)
+    setActionError(null)
+    try {
+      await routeConversationToAi(activeConversation.id)
+      setIsTransferModalOpen(false)
+    } catch (error) {
+      setActionError(
+        extractActionErrorMessage(error, 'Nao foi possivel direcionar o atendimento para a IA.')
+      )
+    } finally {
+      setIsTransferring(false)
+    }
+  }
+
+  async function handleAssumeConversation() {
+    if (!activeConversation || !currentUserId || !canAssumeConversation) return
+
+    setIsAssuming(true)
+    setActionError(null)
+    try {
+      await assignConversation(activeConversation.id, currentUserId)
+    } catch (error) {
+      setActionError(extractActionErrorMessage(error, 'Nao foi possivel assumir o atendimento.'))
+    } finally {
+      setIsAssuming(false)
     }
   }
 
@@ -216,8 +299,18 @@ export default function ChatHeader({
             <p className="text-xs opacity-50 truncate">
               {getContactLabel(getConversationPhone(activeConversation.phone, activeConversation.remoteJid))}
             </p>
-            {(isClosed || scheduledReopenLabel) && (
+            {(isClosed || scheduledReopenLabel || isWaitingInQueue || isAiOwned) && (
               <div className="flex flex-wrap items-center gap-2 pt-1">
+                {isWaitingInQueue ? (
+                  <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-amber-200">
+                    Na fila
+                  </span>
+                ) : null}
+                {isAiOwned ? (
+                  <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-sky-100">
+                    Com IA
+                  </span>
+                ) : null}
                 {isClosed ? (
                   <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-white/58">
                     Encerrado
@@ -235,6 +328,17 @@ export default function ChatHeader({
         </div>
 
         <div className="flex items-center gap-1 md:gap-2">
+          {canAssumeConversation ? (
+            <button
+              type="button"
+              onClick={handleAssumeConversation}
+              disabled={isAssuming}
+              className="ml-1 flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-100 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 md:ml-0"
+            >
+              <span>{isAssuming ? 'Assumindo...' : 'Assumir atendimento'}</span>
+            </button>
+          ) : null}
+
           <button
             type="button"
             onClick={() => setIsDetailsDrawerOpen(true)}
@@ -246,7 +350,8 @@ export default function ChatHeader({
           <button
             type="button"
             onClick={() => setIsTransferModalOpen(true)}
-            className="cursor-pointer rounded-xl p-2 transition hover:bg-white/10"
+            disabled={isClosed}
+            className="cursor-pointer rounded-xl p-2 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowLeftRight size={18} />
           </button>
@@ -267,6 +372,12 @@ export default function ChatHeader({
         </div>
       </header>
 
+      {actionError ? (
+        <div className="border-b border-rose-500/10 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          {actionError}
+        </div>
+      ) : null}
+
       <ConversationDetailsDrawer
         isOpen={isDetailsDrawerOpen}
         onClose={() => setIsDetailsDrawerOpen(false)}
@@ -282,11 +393,67 @@ export default function ChatHeader({
             <div className="space-y-2">
               <h3 className="text-xl font-semibold">Transferir atendimento</h3>
               <p className="text-sm opacity-70">
-                Escolha um atendente online para receber este atendimento.
+                Escolha outro atendente online, devolva para a fila ou direcione a conversa para a IA.
               </p>
             </div>
 
             <div className="mt-5 flex flex-col gap-2">
+              {isAssignedToAnotherUser ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/70">
+                  Este atendimento esta atualmente com{' '}
+                  <span className="font-medium text-white">
+                    {activeConversation.assignedUser?.name ?? 'outro atendente'}
+                  </span>
+                  .
+                </div>
+              ) : null}
+
+              {!activeConversation.assignedUserId && isAiOwned ? (
+                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4 text-sm text-sky-100">
+                  Este atendimento ja esta sendo conduzido pela IA no momento.
+                </div>
+              ) : null}
+
+              {activeConversation.assignedUserId ? (
+                <button
+                  type="button"
+                  onClick={handleReturnToQueue}
+                  disabled={isTransferring}
+                  className="flex items-center justify-between rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4 text-left transition hover:bg-amber-500/15 disabled:opacity-50 cursor-pointer"
+                >
+                  <div>
+                    <p className="font-medium">Voltar para a fila</p>
+                    <p className="text-xs text-white/55">
+                      Remove o responsavel atual e deixa o atendimento disponivel para a equipe.
+                    </p>
+                  </div>
+                  <span className="text-xs text-amber-300">Fila</span>
+                </button>
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">
+                  {isAiOwned
+                    ? 'Este atendimento esta com a IA e sem responsavel humano definido.'
+                    : 'Este atendimento ja esta na fila e sem responsavel definido.'}
+                </div>
+              )}
+
+              {!isAiOwned ? (
+                <button
+                  type="button"
+                  onClick={handleRouteToAi}
+                  disabled={isTransferring}
+                  className="flex items-center justify-between rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4 text-left transition hover:bg-sky-500/15 disabled:opacity-50 cursor-pointer"
+                >
+                  <div>
+                    <p className="font-medium">Direcionar para a IA</p>
+                    <p className="text-xs text-white/55">
+                      A conversa passa a ser conduzida pela IA ate precisar de um humano.
+                    </p>
+                  </div>
+                  <span className="text-xs text-sky-200">IA</span>
+                </button>
+              ) : null}
+
               {transferTargets.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/65">
                   Nenhum outro atendente esta online agora.

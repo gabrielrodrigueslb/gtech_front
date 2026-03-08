@@ -62,10 +62,30 @@ export default function ChatFooter() {
   const hasRecordedAudio = !!recordedAudioBlob && !!recordedAudioUrl
   const isComposerLocked = isRecording || hasRecordedAudio
   const showComposerTools = !isComposerLocked
+  const routingOwnerType =
+    activeConversation?.routing?.ownerType ??
+    (activeConversation?.assignedUserId ? 'user' : 'queue')
   const isConversationClosed =
     activeConversation?.status === 'CLOSED' || activeConversation?.status === 'ARCHIVED'
+  const isConversationInQueue =
+    routingOwnerType === 'queue' && !activeConversation?.assignedUserId
+  const isConversationWithAi =
+    routingOwnerType === 'ai_agent' && !activeConversation?.assignedUserId
+  const isConversationAssignedToAnotherUser = Boolean(
+    activeConversation?.assignedUserId &&
+      currentUserId &&
+      activeConversation.assignedUserId !== currentUserId
+  )
   const isInputDisabled =
-    !activeConversationId || !activeConversation || isConversationClosed || isBusy || !currentUserId || isRecording
+    !activeConversationId ||
+    !activeConversation ||
+    isConversationClosed ||
+    isConversationInQueue ||
+    isConversationWithAi ||
+    isConversationAssignedToAnotherUser ||
+    isBusy ||
+    !currentUserId ||
+    isRecording
 
   function formatDuration(totalSeconds: number) {
     return `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(
@@ -463,6 +483,28 @@ export default function ChatFooter() {
         </div>
       )}
 
+      {isConversationInQueue && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Este atendimento esta na fila. Assuma o atendimento no cabecalho para responder.
+        </div>
+      )}
+
+      {isConversationWithAi && (
+        <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+          Este atendimento esta com a IA. Assuma no cabecalho se quiser continuar manualmente.
+        </div>
+      )}
+
+      {isConversationAssignedToAnotherUser && (
+        <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/75">
+          Este atendimento esta com{' '}
+          <span className="font-medium text-white">
+            {activeConversation?.assignedUser?.name ?? 'outro atendente'}
+          </span>
+          . A conversa fica em modo leitura enquanto nao estiver com voce.
+        </div>
+      )}
+
       <div className="flex w-full items-center gap-3">
         <div ref={composerToolsRef} className="relative flex h-8 shrink-0 items-center gap-2">
           {showComposerTools ? (
@@ -473,7 +515,14 @@ export default function ChatFooter() {
                   setIsEmojiMenuOpen(false)
                   setIsAttachmentMenuOpen((current) => !current)
                 }}
-                disabled={!activeConversationId || isBusy || isConversationClosed}
+                disabled={
+                  !activeConversationId ||
+                  isBusy ||
+                  isConversationClosed ||
+                  isConversationInQueue ||
+                  isConversationWithAi ||
+                  isConversationAssignedToAnotherUser
+                }
                 className="cursor-pointer rounded-sm p-1 transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Plus />
@@ -484,7 +533,13 @@ export default function ChatFooter() {
                   setIsAttachmentMenuOpen(false)
                   setIsEmojiMenuOpen((current) => !current)
                 }}
-                disabled={!activeConversationId || isConversationClosed}
+                disabled={
+                  !activeConversationId ||
+                  isConversationClosed ||
+                  isConversationInQueue ||
+                  isConversationWithAi ||
+                  isConversationAssignedToAnotherUser
+                }
                 className="cursor-pointer rounded-sm p-1 transition-all hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <SmilePlus />
@@ -587,9 +642,15 @@ export default function ChatFooter() {
                   ? 'Selecione uma conversa'
                   : isConversationClosed
                     ? 'Atendimento encerrado. Historico em modo leitura'
+                  : isConversationInQueue
+                    ? 'Assuma o atendimento para responder'
+                  : isConversationWithAi
+                    ? 'A IA esta conduzindo este atendimento'
+                  : isConversationAssignedToAnotherUser
+                    ? `Este atendimento esta com ${activeConversation?.assignedUser?.name ?? 'outro atendente'}`
                   : !currentUserId
-                    ? 'Carregando usuario...'
-                    : 'Escreva sua mensagem'
+                      ? 'Carregando usuario...'
+                      : 'Escreva sua mensagem'
               }
             />
           )}
@@ -629,7 +690,15 @@ export default function ChatFooter() {
             <button
               type="button"
               onClick={handlePrimaryAction}
-              disabled={!activeConversationId || isBusy || !currentUserId || isConversationClosed}
+              disabled={
+                !activeConversationId ||
+                isBusy ||
+                !currentUserId ||
+                isConversationClosed ||
+                isConversationInQueue ||
+                isConversationWithAi ||
+                isConversationAssignedToAnotherUser
+              }
               className="flex size-12 cursor-pointer items-center justify-center rounded-full bg-primary p-1 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {hasText ? <SendHorizontal /> : <Mic />}

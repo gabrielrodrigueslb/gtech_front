@@ -23,16 +23,19 @@ function ChatPageInner() {
   const { setHideMobileNav } = useAppShell();
   const { conversations, currentUserId, activeConversationId } = useWhatsApp();
   const isMobile = useIsMobile();
-  const [queueFilter, setQueueFilter] = useState<'mine' | 'unassigned'>('mine');
+  const [queueFilter, setQueueFilter] = useState<'mine' | 'queue' | 'open'>('mine');
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
   const previousActiveConversationRef = useRef<string | null>(null);
+  const queueCount = conversations.filter((conversation) => {
+    const ownerType =
+      conversation.routing?.ownerType ?? (conversation.assignedUserId ? 'user' : 'queue');
+    return ownerType === 'queue' && !conversation.assignedUserId;
+  }).length;
   const myCount = conversations.filter(
     (conversation) => conversation.assignedUserId === currentUserId,
   ).length;
-  const unassignedCount = conversations.filter(
-    (conversation) => !conversation.assignedUserId,
-  ).length;
+  const openCount = conversations.length;
 
   useEffect(() => {
     if (!isMobile) {
@@ -71,7 +74,7 @@ function ChatPageInner() {
         }`}
       >
         <header className='pb-1 border-b-1 border-border'>
-        <div className="mx-3 my-4 grid grid-cols-2 gap-2 ">
+        <div className="mx-3 my-4 grid grid-cols-3 gap-2 ">
           <button
             type="button"
             onClick={() => setQueueFilter('mine')}
@@ -85,14 +88,25 @@ function ChatPageInner() {
           </button>
           <button
             type="button"
-            onClick={() => setQueueFilter('unassigned')}
+            onClick={() => setQueueFilter('queue')}
             className={`rounded-2xl p-2 text-xs font-medium transition cursor-pointer ${
-              queueFilter === 'unassigned'
+              queueFilter === 'queue'
                 ? 'bg-primary text-white'
                 : 'border border-white/10 bg-background/40 text-white/70 hover:bg-white/5'
             }`}
           >
-            Fila ({unassignedCount})
+            Fila ({queueCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setQueueFilter('open')}
+            className={`rounded-2xl p-2 text-xs font-medium transition cursor-pointer ${
+              queueFilter === 'open'
+                ? 'bg-primary text-white'
+                : 'border border-white/10 bg-background/40 text-white/70 hover:bg-white/5'
+            }`}
+          >
+            Abertos ({openCount})
           </button>
         </div>
         <div className='flex mb-4 mx-3 gap-3'>
