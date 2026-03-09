@@ -33,4 +33,13 @@ export function resolveSocketUrl() {
   return explicitSocketUrl || apiBaseUrl || browserOrigin
 }
 
+export function resolveSocketPath() {
+  const configuredPath = String(process.env.NEXT_PUBLIC_SOCKET_PATH ?? '').trim()
+  if (configuredPath) {
+    return configuredPath.startsWith('/') ? configuredPath : `/${configuredPath}`
+  }
+
+  return '/api/socket.io'
+}
+
 export const DEFAULT_SOCKET_TRANSPORTS = ['polling', 'websocket'] as const

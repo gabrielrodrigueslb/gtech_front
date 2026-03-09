@@ -27,7 +27,7 @@ import {
   updateWhatsAppDistributionConfig,
   WHATSAPP_AI_MODEL_PRESETS,
 } from '@/lib/whatsapp-client';
-import { DEFAULT_SOCKET_TRANSPORTS, resolveSocketUrl } from '@/lib/socket';
+import { DEFAULT_SOCKET_TRANSPORTS, resolveSocketPath, resolveSocketUrl } from '@/lib/socket';
 import type {
   WhatsAppAiAgentConfig,
   WhatsAppAiKnowledgeItem,
@@ -392,9 +392,11 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     const socketUrl = resolveSocketUrl();
+    const socketPath = resolveSocketPath();
     if (!socketUrl) return;
 
     const socket = io(socketUrl, {
+      path: socketPath,
       withCredentials: true,
       transports: [...DEFAULT_SOCKET_TRANSPORTS],
       reconnection: true,
