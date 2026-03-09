@@ -27,6 +27,7 @@ import {
   updateWhatsAppDistributionConfig,
   WHATSAPP_AI_MODEL_PRESETS,
 } from '@/lib/whatsapp-client';
+import { DEFAULT_SOCKET_TRANSPORTS, resolveSocketUrl } from '@/lib/socket';
 import type {
   WhatsAppAiAgentConfig,
   WhatsAppAiKnowledgeItem,
@@ -390,15 +391,23 @@ export default function ConfiguracoesPage() {
   }, [isLoadingUser, user]);
 
   useEffect(() => {
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    const socketUrl = resolveSocketUrl();
     if (!socketUrl) return;
 
     const socket = io(socketUrl, {
       withCredentials: true,
-      transports: ['websocket'],
+      transports: [...DEFAULT_SOCKET_TRANSPORTS],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1_000,
+      reconnectionDelayMax: 5_000,
     });
 
     socketRef.current = socket;
+
+    socket.on('connect_error', (error) => {
+      console.error('[Socket][WhatsApp Config] Falha na conexao:', error?.message ?? error);
+    });
 
     socket.on('whatsapp:qr', ({ qr }: { qr: string }) => {
       setSession((current) => ({

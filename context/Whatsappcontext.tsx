@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { getUsers, getMe } from '@/lib/auth'
+import { DEFAULT_SOCKET_TRANSPORTS, resolveSocketUrl } from '@/lib/socket'
 import {
   assignConversation as assignConversationApi,
   closeConversation as closeConversationApi,
@@ -220,21 +221,37 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL!, {
+    const socketUrl = resolveSocketUrl()
+    if (!socketUrl) {
+      setIsConnected(false)
+      console.error('[Socket] URL nao resolvida para o WhatsApp')
+      return
+    }
+
+    const socket = io(socketUrl, {
       withCredentials: true,
-      transports: ['websocket'],
+      transports: [...DEFAULT_SOCKET_TRANSPORTS],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1_000,
+      reconnectionDelayMax: 5_000,
     })
 
     socketRef.current = socket
 
     socket.on('connect', () => {
       setIsConnected(true)
-      console.log('[Socket] Conectado')
+      console.log('[Socket] Conectado', socketUrl)
     })
 
     socket.on('disconnect', () => {
       setIsConnected(false)
       console.log('[Socket] Desconectado')
+    })
+
+    socket.on('connect_error', (error) => {
+      setIsConnected(false)
+      console.error('[Socket] Falha na conexao do WhatsApp:', error?.message ?? error)
     })
 
     socket.on('agents:online', ({ userIds }: { userIds: string[] }) => {
@@ -336,6 +353,7 @@ export function WhatsAppProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       socket.disconnect()
+      socketRef.current = null
     }
   }, [clearActiveConversationSelection])
 
